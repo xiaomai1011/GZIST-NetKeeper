@@ -1,0 +1,14 @@
+# 隐私文件: 含账号密码/日志, 严禁上传
+campusnet_config.json
+campusnet_log.txt
+断网重连测试结果.txt
+
+# 临时与测试文件
+_*
+*_test*
+*.log
+*.tmp
+
+# 系统文件
+Thumbs.db
+desktop.ini

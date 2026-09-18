@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>校园网自动登录工具 - 使用说明</title>
+<title>GZIST 校园网自动登录保活工具 · 使用说明</title>
+<meta name="description" content="广州理工学院校园网自动登录与保活工具：适配 2026-09 学校认证系统升级后的新接口（Dr.COM / eportal），掉线自动重连、开机自启、无窗口后台运行。">
 <style>
   :root{
     --bg:#f6f8fa; --card:#ffffff; --border:#e2e8f0; --text:#1e293b;
@@ -13,7 +14,10 @@
   body{font-family:"Microsoft YaHei","PingFang SC",sans-serif;background:var(--bg);color:var(--text);line-height:1.75;padding:32px 16px}
   .wrap{max-width:860px;margin:0 auto}
   h1{font-size:26px;margin-bottom:6px}
-  .sub{color:var(--muted);margin-bottom:28px;font-size:14px}
+  .sub{color:var(--muted);margin-bottom:18px;font-size:14px}
+  .cta{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:26px}
+  .btn{display:inline-block;background:var(--accent);color:#fff;text-decoration:none;padding:9px 20px;border-radius:8px;font-weight:600;font-size:14.5px}
+  .btn.ghost{background:#fff;color:var(--accent);border:1px solid #bfdbfe}
   .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:24px 28px;margin-bottom:20px}
   h2{font-size:18px;margin-bottom:14px;padding-left:12px;border-left:4px solid var(--accent)}
   p{margin-bottom:10px;font-size:14.5px}
@@ -30,17 +34,27 @@
   .step .num{flex:0 0 30px;height:30px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px}
   .step .body{flex:1}
   .step .body b{display:block;margin-bottom:2px}
+  .note{color:var(--muted);font-size:13px}
+  img.demo{width:100%;display:block;border-radius:10px;border:1px solid var(--border);margin-top:10px}
+  footer{text-align:center;color:var(--muted);font-size:13px;padding:8px 0 24px}
+  footer a{color:var(--accent);text-decoration:none}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>广州理工学院 · 校园网自动登录工具</h1>
+
+  <h1>广州理工学院 · 校园网自动登录保活工具</h1>
   <div class="sub">支持 WiFi / 有线 · 开机自启 · 休眠唤醒自动重连 · 零依赖（无需安装任何软件）</div>
+
+  <div class="cta">
+    <a class="btn" href="https://github.com/xiaomai1011/GZIST-campusnet-autologin/releases/latest">↓ 下载最新版 ZIP</a>
+    <a class="btn ghost" href="https://github.com/xiaomai1011/GZIST-campusnet-autologin">查看 GitHub 仓库</a>
+  </div>
 
   <div class="card">
     <h2>一、这个工具解决什么问题</h2>
     <p>学校的认证服务器（10.0.10.252）在电脑重启、休眠唤醒、WiFi 重连后会删除登录会话，所以每次都要重新打开网页输账号密码。这个工具会在后台默默检查网络：<b>一旦发现掉线，就自动向认证服务器发送登录请求</b>，全程无需你操作。</p>
-    <p style="color:var(--muted);font-size:13px">原理：参考了广州理工学院同学开源的登录脚本（GitHub: GZIST_CampusNet_AutoLogin），调用学校认证系统的 eportal 接口（http://10.0.10.252:801/eportal/），自动检测本机 IP 和 MAC 地址并携带账号密码完成认证。</p>
+    <p class="note">原理：调用学校认证系统的 eportal 新版接口（<code>ACSetting&amp;a=Login</code>），自动检测本机 IP 和 MAC 地址并携带账号密码完成认证，并紧跟网关 302 跳转携带权威参数。旧的 <code>Portal&amp;a=login</code> 接口在 2026-09 学校升级后已全部返回 500，本项目已适配。</p>
   </div>
 
   <div class="card">
@@ -58,24 +72,27 @@
       <p>双击 <span class="file">安装开机自启.bat</span>。之后每次登录 Windows 会自动在后台启动保活守护，重启、休眠唤醒后掉线也会在约 1 分钟内自动重连。装完无需重启，立刻生效。</p>
     </div></div>
     <div class="tip"><b>建议</b>：把这个文件夹放在桌面或其他固定位置，不要放进「下载」后随手删掉——开机自启会引用这里的脚本路径。</div>
-    <div class="tip"><b>已实测</b>：2026-09-11 在有线网环境完成了完整闭环测试（接口注销下线 → 自动检测掉线 → 自动重登 → 恢复上网），全程约 20 秒，结果见文件夹内《断网重连测试结果.txt》。检测改用 HTTPS 证书校验，校园网未认证时的 HTTP 劫持/白名单放行都不会再造成误判。</div>
+    <div class="tip"><b>已实测</b>：2026-09-18 学校认证系统升级后完成验收测试 —— 主动注销下线 → 23 秒自动恢复 → 验证通过；守护自愈测试同样 PASS。检测使用 HTTPS 证书校验，校园网未认证时的 HTTP 劫持 / 白名单放行都不会造成误判。</div>
+    <img class="demo" src="docs/demo.svg" alt="实测日志：注销下线后 23 秒自动恢复">
+    <p class="note">上图为本项目 2026-09-18 的真实测试日志（学号、IP、MAC 已隐去）。</p>
   </div>
 
   <div class="card">
     <h2>三、文件说明</h2>
     <table>
       <tr><th>文件</th><th>作用</th></tr>
-      <tr><td><span class="file">校园网登录.bat</span></td><td>手动登录一次（带窗口，能看结果），测试用</td></tr>
       <tr><td><span class="file">重新配置账号.bat</span></td><td>首次使用 / 改密码时运行，重新填写学号密码</td></tr>
+      <tr><td><span class="file">校园网登录.bat</span></td><td>手动登录一次（带窗口，能看结果），测试用</td></tr>
       <tr><td><span class="file">安装开机自启.bat</span></td><td>设置开机自动后台保活（注册表方式，无需管理员权限），并立即启动守护，<b>推荐</b></td></tr>
       <tr><td><span class="file">启动后台保活.bat</span></td><td>临时手动启动一次后台守护（已运行时会自动跳过，不会重复启动）</td></tr>
-      <tr><td><span class="file">卸载开机自启.bat</span></td><td>取消开机自启（同时清理旧版计划任务）</td></tr>
-      <tr><td><span class="file">诊断检测.bat</span></td><td>一键诊断：在线状态、门户劫持探测、网卡信息、配置文件</td></tr>
-      <tr><td><span class="file">注销测试.bat</span></td><td>一键注销校园网（调认证服务器接口），用来测试自动重连</td></tr>
+      <tr><td><span class="file">卸载开机自启.bat</span></td><td>取消开机自启并结束守护进程</td></tr>
+      <tr><td><span class="file">诊断检测.bat</span></td><td>一键诊断：在线状态、配置、守护进程状态（出问题先跑这个）</td></tr>
+      <tr><td><span class="file">注销测试.bat</span></td><td>一键注销校园网（调认证服务器接口），用来验证自动重连效果</td></tr>
       <tr><td><span class="file">campus_net.ps1</span></td><td>核心脚本（自动改密码不用动它）</td></tr>
       <tr><td><span class="file">campusnet_log.txt</span></td><td>运行日志（自动生成，出问题先看它）</td></tr>
       <tr><td><span class="file">campusnet_config.json</span></td><td>保存你的账号密码（自动生成）</td></tr>
     </table>
+    <p class="note">另有 install_autostart.ps1、logout.ps1、silent_start.vbs 三个内部脚本，由 bat 自动调用，不需要手动运行。</p>
   </div>
 
   <div class="card">
@@ -86,19 +103,27 @@
       <tr><td>登录失败 ret_code=2</td><td>账号在别处登录了，先把其他设备下线</td></tr>
       <tr><td>提示未检测到网卡</td><td>先插网线或连上校园网 WiFi，再运行脚本</td></tr>
       <tr><td>改了校园网密码</td><td>双击 <span class="file">重新配置账号.bat</span> 重新填一次</td></tr>
-      <tr><td>休眠唤醒后过了一会儿才恢复</td><td>正常现象，守护每 60 秒检测一次，最多等约 1 分钟</td></tr>
-      <tr><td>想确认后台在不在运行</td><td>打开 campusnet_log.txt 看最新记录；或任务管理器里搜 powershell</td></tr>
+      <tr><td>休眠唤醒后过了一会儿才恢复</td><td>正常现象。守护每 10 秒检测一次，通常 15~30 秒内恢复；重启 / 休眠唤醒后网卡重新初始化较慢，最多约 1 分钟</td></tr>
+      <tr><td>想确认后台在不在运行</td><td>运行 <span class="file">诊断检测.bat</span>；或打开 campusnet_log.txt 看最新一条是否有守护心跳记录</td></tr>
+      <tr><td>想改检测间隔</td><td>编辑 campus_net.ps1 里的 <code>$CheckInterval</code>（单位秒，默认 10）。不建议设得过短</td></tr>
+      <tr><td>怎么彻底卸载</td><td>先运行 <span class="file">卸载开机自启.bat</span>，再删掉整个文件夹即可</td></tr>
     </table>
   </div>
 
   <div class="card">
     <h2>五、安全须知</h2>
     <ul>
-      <li>密码保存在本机 <span class="file">campusnet_config.json</span> 里（仅做了编码混淆，不是强加密）。<b>分享本工具给别人时，不要把自己的 campusnet_config.json 和 campusnet_log.txt 一起发出去</b>（正式分享版压缩包已自动排除这两个文件）。</li>
-      <li>脚本只向你学校的认证服务器发送登录请求，不上传任何数据到其他地方。</li>
-      <li>仅供个人学习使用，请遵守学校网络使用规定；如学校更换认证系统，脚本需要更新。</li>
+      <li>密码保存在本机 <span class="file">campusnet_config.json</span> 里（仅 Base64 编码混淆，<b>不是加密</b>）。<b>分享本工具给别人时，不要把自己的 campusnet_config.json 和 campusnet_log.txt 一起发出去</b>（GitHub Release 里的压缩包已排除这两个文件）。</li>
+      <li>脚本只向你学校的认证服务器（10.0.10.252）发送登录请求，不上传任何数据到其他地方。</li>
+      <li>仅供个人学习交流使用，请遵守学校网络使用规定；如学校再次更换认证系统，脚本需要相应更新。</li>
     </ul>
   </div>
+
+  <footer>
+    开源项目 · MIT License ·
+    <a href="https://github.com/xiaomai1011/GZIST-campusnet-autologin">xiaomai1011/GZIST-campusnet-autologin</a>
+  </footer>
+
 </div>
 </body>
 </html>

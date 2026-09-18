@@ -5,7 +5,7 @@
 
 **已实测**：主动注销下线后约 **15~25 秒** 自动重连恢复；重启 / 休眠唤醒 / 拔插网线后约 **1 分钟内** 恢复。全程无需人工干预。
 
-**[⬇️ 下载最新版 ZIP](../../releases/latest)** &nbsp;·&nbsp; [图文使用说明](使用说明.html) &nbsp;·&nbsp; [常见问题](#常见问题) &nbsp;·&nbsp; [工作原理](#工作原理简要)
+**[⬇️ 下载最新版 ZIP](../../releases/latest)** &nbsp;·&nbsp; [📖 图文使用说明（在线）](https://xiaomai1011.github.io/GZIST-campusnet-autologin/) &nbsp;·&nbsp; [常见问题](#常见问题) &nbsp;·&nbsp; [工作原理](#工作原理简要)
 
 ![实测日志](docs/demo.svg)
 
@@ -59,7 +59,7 @@
 | `silent_start.vbs` | 静默启动器（被 bat 调用，避免弹出窗口） |
 | `install_autostart.ps1` | 自启安装逻辑（被 `安装开机自启.bat` 调用） |
 | `logout.ps1` | 注销逻辑（被 `注销测试.bat` 调用） |
-| `使用说明.html` | 图文详细教程 + 常见问题 |
+| `index.html` | 图文详细教程 + 常见问题（也是 [GitHub Pages 首页](https://xiaomai1011.github.io/GZIST-campusnet-autologin/)，离线时可直接双击打开） |
 
 > 倒数三个是内部脚本，由 bat 自动调用，不需要手动运行。
 

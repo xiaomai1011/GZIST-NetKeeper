@@ -446,6 +446,13 @@ if ($Setup) {
 }
 
 if (-not (Test-Path $ConfigFile)) {
+    if ($Watch) {
+        # 后台/开机自启场景下没有控制台可输入, 绝不能进入交互式配置问答,
+        # 否则进程会永久挂起, 且一行日志都不写(看起来像在守护, 其实什么都没做)。
+        Write-Log "未找到配置文件: $ConfigFile" "ERROR"
+        Write-Log "保活守护拒绝启动(后台模式无法交互式配置), 请双击[重新配置账号.bat]完成配置后再启动" "ERROR"
+        exit 1
+    }
     Write-Host "首次使用, 请先配置学号和密码:" -ForegroundColor Cyan
     Start-Setup
     if (-not (Test-Path $ConfigFile)) { exit 1 }

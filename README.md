@@ -125,7 +125,15 @@
 
 ## 致谢
 
-- 登录接口格式参考 [YT-O5/GZIST_CampusNet_AutoLogin](https://github.com/YT-O5/GZIST_CampusNet_AutoLogin)（MIT License），该项目已失效删除，本项目在其基础上重写并适配了 2026-09 的新认证系统
+本项目参考了 [YT-O5/GZIST_CampusNet_AutoLogin](https://github.com/YT-O5/GZIST_CampusNet_AutoLogin)
+的登录接口格式与整体设计思路，在此向原作者致谢。
+
+- 该项目采用 MIT License，版权归 **ytt_pineapple** 所有（`Copyright (c) 2025 ytt_pineapple`）
+- 它使用的仍是 2026-09 学校认证系统升级**之前**的旧接口（`Portal&a=login`），在现行系统下已无法完成登录。
+  本项目在其基础上重写，适配了新版 `ePortal`（`ACSetting&a=Login`）接口，并增加了后台保活与诊断功能
+- 该仓库**并未删除，作者仍在维护**（其 README 现标注「过两天重做」）
+
+完整的版权与归属声明见 [NOTICE](NOTICE)。
 
 ## License
 

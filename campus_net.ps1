@@ -6,7 +6,7 @@
 #    campus_net.ps1 -Interactive   手动登录(带输出窗口)
 #    campus_net.ps1 -Setup         首次配置/重新配置账号
 #    campus_net.ps1 -Watch         后台保活守护(掉线自动重登)
-#  参考: github.com/YT-O5/GZIST_CampusNet_AutoLogin (MIT License)
+#  参考: github.com/YT-O5/GZIST_CampusNet_AutoLogin (MIT, Copyright (c) 2025 ytt_pineapple)
 # =====================================================================
 param(
     [switch]$Setup,

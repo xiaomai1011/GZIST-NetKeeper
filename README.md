@@ -1,11 +1,11 @@
-# GZIST 校园网自动登录保活工具
+# GZIST-NetKeeper · 校园网自动登录保活工具
 
 广州理工学院校园网（城市热点 Dr.COM / eportal，门户 `10.0.10.252`）自动登录与保活工具。
 适配 **2026 年 9 月学校认证系统升级后的新接口** —— 老脚本集体失效之后，这是目前实测可用的版本。
 
 **已实测**：主动注销下线后约 **15~25 秒** 自动重连恢复；重启 / 休眠唤醒 / 拔插网线后约 **1 分钟内** 恢复。全程无需人工干预。
 
-**[⬇️ 下载最新版 ZIP](../../releases/latest)** &nbsp;·&nbsp; [📖 图文使用说明（在线）](https://xiaomai1011.github.io/GZIST-campusnet-autologin/) &nbsp;·&nbsp; [常见问题](#常见问题) &nbsp;·&nbsp; [工作原理](#工作原理简要)
+**[⬇️ 下载最新版 ZIP](../../releases/latest)** &nbsp;·&nbsp; [📖 图文使用说明（在线）](https://xiaomai1011.github.io/GZIST-NetKeeper/) &nbsp;·&nbsp; [常见问题](#常见问题) &nbsp;·&nbsp; [工作原理](#工作原理简要)
 
 ![实测日志](docs/demo.svg)
 
@@ -13,7 +13,7 @@
 
 ## 🚀 三步上手（新用户从这里开始）
 
-1. **下载 ZIP，解压到一个固定文件夹**（例如 `D:\校园网自动登录\`）—— 之后就一直用这个文件夹
+1. **下载 ZIP，解压到一个固定文件夹**（例如 `D:\GZIST-NetKeeper\`）—— 之后就一直用这个文件夹
 2. **双击 `重新配置账号.bat`**，输入学号和校园网密码（只填这一次，保存在本机）
 3. **双击 `安装开机自启.bat`** —— 它同时装好开机自启与后台保活，之后的掉线都会自动重连
 
@@ -63,7 +63,7 @@
 | `silent_start.vbs` | 静默启动器（被 bat 调用，避免弹出窗口） |
 | `install_autostart.ps1` | 自启安装逻辑（被 `安装开机自启.bat` 调用） |
 | `logout.ps1` | 注销逻辑（被 `注销测试.bat` 调用） |
-| `index.html` | 图文详细教程 + 常见问题（也是 [GitHub Pages 首页](https://xiaomai1011.github.io/GZIST-campusnet-autologin/)，离线时可直接双击打开） |
+| `index.html` | 图文详细教程 + 常见问题（也是 [GitHub Pages 首页](https://xiaomai1011.github.io/GZIST-NetKeeper/)，离线时可直接双击打开） |
 
 > 倒数三个是内部脚本，由 bat 自动调用，不需要手动运行。
 

@@ -52,16 +52,10 @@
   </div>
 
   <div class="card">
-    <h2>一、这个工具解决什么问题</h2>
-    <p>学校的认证服务器（10.0.10.252）在电脑重启、休眠唤醒、WiFi 重连后会删除登录会话，所以每次都要重新打开网页输账号密码。这个工具会在后台默默检查网络：<b>一旦发现掉线，就自动向认证服务器发送登录请求</b>，全程无需你操作。</p>
-    <p class="note">原理：调用学校认证系统的 eportal 新版接口（<code>ACSetting&amp;a=Login</code>），自动检测本机 IP 和 MAC 地址并携带账号密码完成认证，并紧跟网关 302 跳转携带权威参数。旧的 <code>Portal&amp;a=login</code> 接口在 2026-09 学校升级后已全部返回 500，本项目已适配。</p>
-  </div>
-
-  <div class="card">
-    <h2>二、快速上手（只需 3 步）</h2>
+    <h2>一、快速上手（只需 3 步）</h2>
     <div class="step"><div class="num">1</div><div class="body">
-      <b>配置账号</b>
-      <p>双击 <span class="file">重新配置账号.bat</span>，输入学号和校园网密码（输密码时屏幕上不显示，正常输入后回车即可）。</p>
+      <b>解压 + 配置账号</b>
+      <p>把下载的 ZIP 解压到一个固定文件夹（例如 <code>D:\校园网自动登录\</code>），双击 <span class="file">重新配置账号.bat</span>，输入学号和校园网密码（输密码时屏幕上不显示，正常输入后回车即可）。</p>
     </div></div>
     <div class="step"><div class="num">2</div><div class="body">
       <b>测试登录</b>
@@ -71,10 +65,17 @@
       <b>安装开机自启</b>
       <p>双击 <span class="file">安装开机自启.bat</span>。之后每次登录 Windows 会自动在后台启动保活守护，重启、休眠唤醒后掉线也会在约 1 分钟内自动重连。装完无需重启，立刻生效。</p>
     </div></div>
-    <div class="tip"><b>建议</b>：把这个文件夹放在桌面或其他固定位置，不要放进「下载」后随手删掉——开机自启会引用这里的脚本路径。</div>
+    <div class="warn"><b>以后所有操作都用这同一个文件夹。</b>脚本按「自己所在的目录」找配置，换个文件夹双击就会报「未找到配置文件」；文件夹也不要改名或移动——开机自启里记着它的路径。</div>
+    <div class="tip"><b>想确认保活是不是真的在跑</b>：双击 <span class="file">诊断检测.bat</span>，看<b>第 5 项</b>是否显示「运行中」；<b>第 6 项</b>会告诉你开机自启指向的是哪个目录。想直观验证重连，双击 <span class="file">注销测试.bat</span> 把自己踢下线，等十几秒看是否自动恢复。</div>
     <div class="tip"><b>已实测</b>：2026-09-18 学校认证系统升级后完成验收测试 —— 主动注销下线 → 23 秒自动恢复 → 验证通过；守护自愈测试同样 PASS。检测使用 HTTPS 证书校验，校园网未认证时的 HTTP 劫持 / 白名单放行都不会造成误判。</div>
     <img class="demo" src="docs/demo.svg" alt="实测日志：注销下线后 23 秒自动恢复">
     <p class="note">上图为本项目 2026-09-18 的真实测试日志（学号、IP、MAC 已隐去）。</p>
+  </div>
+
+  <div class="card">
+    <h2>二、这个工具解决什么问题</h2>
+    <p>学校的认证服务器（10.0.10.252）在电脑重启、休眠唤醒、WiFi 重连后会删除登录会话，所以每次都要重新打开网页输账号密码。这个工具会在后台默默检查网络：<b>一旦发现掉线，就自动向认证服务器发送登录请求</b>，全程无需你操作。</p>
+    <p class="note">原理：调用学校认证系统的 eportal 新版接口（<code>ACSetting&amp;a=Login</code>），自动检测本机 IP 和 MAC 地址并携带账号密码完成认证，并紧跟网关 302 跳转携带权威参数。旧的 <code>Portal&amp;a=login</code> 接口在 2026-09 学校升级后已全部返回 500，本项目已适配。</p>
   </div>
 
   <div class="card">
@@ -86,7 +87,7 @@
       <tr><td><span class="file">安装开机自启.bat</span></td><td>设置开机自动后台保活（注册表方式，无需管理员权限），并立即启动守护，<b>推荐</b></td></tr>
       <tr><td><span class="file">启动后台保活.bat</span></td><td>临时手动启动一次后台守护（已运行时会自动跳过，不会重复启动）</td></tr>
       <tr><td><span class="file">卸载开机自启.bat</span></td><td>取消开机自启并结束守护进程</td></tr>
-      <tr><td><span class="file">诊断检测.bat</span></td><td>一键诊断：在线状态、配置、守护进程状态（出问题先跑这个）</td></tr>
+      <tr><td><span class="file">诊断检测.bat</span></td><td>一键诊断：在线状态、配置、<b>保活是否在运行</b>、<b>开机自启指向</b>（出问题先跑这个）</td></tr>
       <tr><td><span class="file">注销测试.bat</span></td><td>一键注销校园网（调认证服务器接口），用来验证自动重连效果</td></tr>
       <tr><td><span class="file">campus_net.ps1</span></td><td>核心脚本（自动改密码不用动它）</td></tr>
       <tr><td><span class="file">campusnet_log.txt</span></td><td>运行日志（自动生成，出问题先看它）</td></tr>
@@ -105,7 +106,7 @@
       <tr><td>改了校园网密码</td><td>双击 <span class="file">重新配置账号.bat</span> 重新填一次</td></tr>
       <tr><td>开着 VPN（尤其 TUN 模式）时检测不准、掉线后不自动重连</td><td>VPN 的 TUN 模式会接管系统路由，把发往校园网关的请求也吞进隧道，于是掉线时捕获不到网关的 302 跳转（登录必需的 <code>wlanuserip</code> / <code>wlanusermac</code> / <code>wlanacip</code> 参数就在其中），登录无法完成，在线判断也会失真（可能显示在线其实已掉线）。<b>测试和日常使用请先关闭 VPN</b>，只保留校园网本身的连接</td></tr>
       <tr><td>休眠唤醒后过了一会儿才恢复</td><td>正常现象。守护每 10 秒检测一次，通常 15~30 秒内恢复；重启 / 休眠唤醒后网卡重新初始化较慢，最多约 1 分钟</td></tr>
-      <tr><td>想确认后台在不在运行</td><td>运行 <span class="file">诊断检测.bat</span>；或打开 campusnet_log.txt 看最新一条是否有守护心跳记录</td></tr>
+      <tr><td>想确认后台在不在运行</td><td>运行 <span class="file">诊断检测.bat</span>，看<b>第 5 项</b>：显示「运行中」就是真的在跑（用命名互斥锁判断，比看进程列表准）。没在跑就双击 <span class="file">启动后台保活.bat</span></td></tr>
       <tr><td>想改检测间隔</td><td>编辑 campus_net.ps1 里的 <code>$CheckInterval</code>（单位秒，默认 10）。不建议设得过短</td></tr>
       <tr><td>怎么彻底卸载</td><td>先运行 <span class="file">卸载开机自启.bat</span>，再删掉整个文件夹即可</td></tr>
     </table>

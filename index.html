@@ -103,6 +103,7 @@
       <tr><td>登录失败 ret_code=2</td><td>账号在别处登录了，先把其他设备下线</td></tr>
       <tr><td>提示未检测到网卡</td><td>先插网线或连上校园网 WiFi，再运行脚本</td></tr>
       <tr><td>改了校园网密码</td><td>双击 <span class="file">重新配置账号.bat</span> 重新填一次</td></tr>
+      <tr><td>开着 VPN（尤其 TUN 模式）时检测不准、掉线后不自动重连</td><td>VPN 的 TUN 模式会接管系统路由，把发往校园网关的请求也吞进隧道，于是掉线时捕获不到网关的 302 跳转（登录必需的 <code>wlanuserip</code> / <code>wlanusermac</code> / <code>wlanacip</code> 参数就在其中），登录无法完成，在线判断也会失真（可能显示在线其实已掉线）。<b>测试和日常使用请先关闭 VPN</b>，只保留校园网本身的连接</td></tr>
       <tr><td>休眠唤醒后过了一会儿才恢复</td><td>正常现象。守护每 10 秒检测一次，通常 15~30 秒内恢复；重启 / 休眠唤醒后网卡重新初始化较慢，最多约 1 分钟</td></tr>
       <tr><td>想确认后台在不在运行</td><td>运行 <span class="file">诊断检测.bat</span>；或打开 campusnet_log.txt 看最新一条是否有守护心跳记录</td></tr>
       <tr><td>想改检测间隔</td><td>编辑 campus_net.ps1 里的 <code>$CheckInterval</code>（单位秒，默认 10）。不建议设得过短</td></tr>

@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 430" width="700" height="430" role="img" aria-label="GZIST 校园网保活工具测试日志" font-family="'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono','Menlo',monospace" font-size="14">
+  <rect x="0" y="0" width="700" height="430" rx="12" fill="#1b1b1f"/>
+  <path d="M0 12 A12 12 0 0 1 12 0 H688 A12 12 0 0 1 700 12 V40 H0 Z" fill="#26262b"/>
+  <line x1="0" y1="40.5" x2="700" y2="40.5" stroke="#34343a" stroke-width="1"/>
+
+  <circle cx="22" cy="20" r="6.5" fill="#ff5f57"/>
+  <circle cx="42" cy="20" r="6.5" fill="#febc2e"/>
+  <circle cx="62" cy="20" r="6.5" fill="#28c840"/>
+  <text x="350" y="25" font-family="-apple-system,'Segoe UI','Microsoft YaHei',sans-serif" font-size="13" fill="#9a9aa2" text-anchor="middle">断网重连测试结果.txt — GZIST 校园网保活</text>
+
+  <text x="30" y="78"  fill="#7dd3fc">[07:56:15] ========== 9-18 新版脚本(ACSetting+网关参数)验收测试 ==========</text>
+  <text x="30" y="100" fill="#d4d4d8">[07:56:15] 初始在线状态: True</text>
+  <text x="30" y="122" fill="#d4d4d8">[07:56:15] 步骤A: 新版注销接口下线 (ACSetting&amp;a=Logout)</text>
+  <text x="30" y="144" fill="#8b8b93">[07:56:15]   注销响应: &lt;html&gt;... &lt;body&gt; Logout succeed. &lt;/body&gt; &lt;/html&gt;</text>
+  <text x="30" y="166" fill="#d4d4d8">[07:56:24] 步骤B: 注销后离线验证 = True (期望 True)</text>
+  <text x="30" y="188" fill="#d4d4d8">[07:56:24] 步骤C: 运行新版 campus_net.ps1 自动登录...</text>
+  <text x="30" y="210" fill="#fbbf24">[07:56:47]   脚本耗时: 23 秒</text>
+  <text x="30" y="232" fill="#d4d4d8">[07:56:50] 步骤D: 最终在线验证 = True (期望 True)</text>
+  <text x="30" y="254" fill="#4ade80" font-weight="bold">[07:56:50] &gt;&gt;&gt; 测试 PASS: 新认证系统适配成功!</text>
+
+  <text x="30" y="298" fill="#7dd3fc">[22:08:48] ==== 第三轮: 守护自愈测试(由守护自己完成重连) ====</text>
+  <text x="30" y="320" fill="#8b8b93">[22:08:50] 注销响应: {"result":"1","msg":"注销成功"}</text>
+  <text x="30" y="342" fill="#d4d4d8">[22:08:55] 注销后在线: False (期望 False)</text>
+  <text x="30" y="364" fill="#4ade80" font-weight="bold">[22:09:45] 守护已自动重连! 恢复时间: 22:09:45 ==&gt; 测试 PASS</text>
+
+  <text x="30" y="404" font-family="-apple-system,'Segoe UI','Microsoft YaHei',sans-serif" font-size="12" fill="#6b6b73">* 真实测试日志，学号 / IP / MAC 已打码</text>
+</svg>

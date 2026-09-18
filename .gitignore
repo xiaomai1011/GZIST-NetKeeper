@@ -9,6 +9,11 @@ _*
 *.log
 *.tmp
 
+# 维护者本地文件 (仓库维护用, 不对外公开)
+一键推送GitHub.bat
+一键更新并推送.bat
+仓库信息_复制粘贴用.txt
+
 # 系统文件
 Thumbs.db
 desktop.ini

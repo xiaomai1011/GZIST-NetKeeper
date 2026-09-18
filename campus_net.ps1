@@ -437,6 +437,29 @@ if ($Diag) {
         Write-Host "3. 网卡          : 未检测到已连接的网卡!" -ForegroundColor Red
     }
     Write-Host ("4. 配置文件      : " + $(if (Test-Path $ConfigFile) { "存在" } else { "不存在(请先重新配置账号)" }))
+
+    # 5. 保活守护是否真在运行(Start-Watch 会持有这个命名互斥锁, 比扫进程列表准确)
+    $guardAlive = $false
+    try {
+        $mtx = [System.Threading.Mutex]::OpenExisting("CampusNetGZIST_KeepAlive")
+        $guardAlive = $true
+        $mtx.Dispose()
+    } catch { $guardAlive = $false }
+    Write-Host ("5. 保活守护      : " + $(if ($guardAlive) { "运行中" } else { "未运行 -> 双击[启动后台保活.bat]" })) -ForegroundColor $(if ($guardAlive) { "Green" } else { "Yellow" })
+
+    # 6. 开机自启(顺带校验注册表指向的目录是否就是本脚本所在目录)
+    $runVal = $null
+    try {
+        $runVal = (Get-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" -Name "CampusNetKeepAlive" -ErrorAction Stop).CampusNetKeepAlive
+    } catch { $runVal = $null }
+    if (-not $runVal) {
+        Write-Host "6. 开机自启      : 未设置 -> 双击[安装开机自启.bat]" -ForegroundColor Yellow
+    } elseif ($runVal.IndexOf($ScriptDir, [System.StringComparison]::OrdinalIgnoreCase) -ge 0) {
+        Write-Host "6. 开机自启      : 已设置, 指向本目录" -ForegroundColor Green
+    } else {
+        Write-Host "6. 开机自启      : 指向了别的目录! 请重新双击[安装开机自启.bat]" -ForegroundColor Red
+        Write-Host ("                    当前指向: " + $runVal) -ForegroundColor DarkGray
+    }
     exit 0
 }
 

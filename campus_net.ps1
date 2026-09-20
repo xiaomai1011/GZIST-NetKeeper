@@ -397,8 +397,19 @@ function Start-Watch {
         Write-Log "已有保活守护在运行, 本次不重复启动" "WARN"
         exit 0
     }
-    # 登录后先等网络栈就绪
-    Start-Sleep -Seconds 20
+    # 等物理网卡拿到可用 IPv4(开机时 DHCP 可能尚未完成)
+    # 注意: 这里只能等"网卡就绪"这个前置条件, 不能等 Test-Online ——
+    # 未认证时外网本来就不通, 必须靠脚本自己登录才会通, 等它等于无谓空转到超时。
+    # 实测本机开机后约 9~11 秒网卡就已拿到 IP, 而守护进程要到 40 秒左右才被拉起,
+    # 所以正常情况下这里一次判断就通过, 零等待。
+    $nicDeadline = (Get-Date).AddSeconds(20)
+    $nicWaiting  = $false
+    while ((Get-Date) -lt $nicDeadline) {
+        if (Get-NetInfo) { break }
+        if (-not $nicWaiting) { Write-Log "等待网卡就绪(DHCP 尚未完成)..." "INFO"; $nicWaiting = $true }
+        Start-Sleep -Milliseconds 500
+    }
+    if ($nicWaiting) { Write-Log "网卡已就绪" "OK" }
     Write-Log "保活守护已启动 (每${CheckInterval}秒检测一次, 掉线自动重登)" "OK"
     $failCount = 0
     while ($true) {
@@ -447,18 +458,23 @@ if ($Diag) {
     } catch { $guardAlive = $false }
     Write-Host ("5. 保活守护      : " + $(if ($guardAlive) { "运行中" } else { "未运行 -> 双击[启动后台保活.bat]" })) -ForegroundColor $(if ($guardAlive) { "Green" } else { "Yellow" })
 
-    # 6. 开机自启(顺带校验注册表指向的目录是否就是本脚本所在目录)
-    $runVal = $null
+    # 6. 开机自启(查计划任务; 顺带校验它指向的目录是否就是本脚本所在目录)
+    $taskCmd   = $null
+    $taskState = ""
     try {
-        $runVal = (Get-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" -Name "CampusNetKeepAlive" -ErrorAction Stop).CampusNetKeepAlive
-    } catch { $runVal = $null }
-    if (-not $runVal) {
+        $tk = Get-ScheduledTask -TaskName "CampusNetKeepAlive" -ErrorAction Stop
+        $taskState = [string]$tk.State
+        $taskCmd = (($tk.Actions | ForEach-Object { "$($_.Execute) $($_.Arguments)" }) -join " ").Trim()
+    } catch { $taskCmd = $null }
+    if (-not $taskCmd) {
         Write-Host "6. 开机自启      : 未设置 -> 双击[安装开机自启.bat]" -ForegroundColor Yellow
-    } elseif ($runVal.IndexOf($ScriptDir, [System.StringComparison]::OrdinalIgnoreCase) -ge 0) {
-        Write-Host "6. 开机自启      : 已设置, 指向本目录" -ForegroundColor Green
-    } else {
+    } elseif ($taskCmd.IndexOf($ScriptDir, [System.StringComparison]::OrdinalIgnoreCase) -lt 0) {
         Write-Host "6. 开机自启      : 指向了别的目录! 请重新双击[安装开机自启.bat]" -ForegroundColor Red
-        Write-Host ("                    当前指向: " + $runVal) -ForegroundColor DarkGray
+        Write-Host ("                    当前指向: " + $taskCmd) -ForegroundColor DarkGray
+    } elseif ($taskState -ne "Ready" -and $taskState -ne "Running") {
+        Write-Host ("6. 开机自启      : 计划任务存在但状态异常(State=" + $taskState + "), 请重新双击[安装开机自启.bat]") -ForegroundColor Yellow
+    } else {
+        Write-Host ("6. 开机自启      : 已设置(计划任务), 指向本目录, 状态=" + $taskState) -ForegroundColor Green
     }
     exit 0
 }

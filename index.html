@@ -63,7 +63,7 @@
     </div></div>
     <div class="step"><div class="num">3</div><div class="body">
       <b>安装开机自启</b>
-      <p>双击 <span class="file">安装开机自启.bat</span>。之后每次登录 Windows 会自动在后台启动保活守护，重启、休眠唤醒后掉线也会在约 1 分钟内自动重连。装完无需重启，立刻生效。</p>
+      <p>双击 <span class="file">安装开机自启.bat</span>。之后每次登录 Windows 会自动在后台启动保活守护，重启、休眠唤醒后掉线也会自动重连（通常半分钟内恢复上网）。装完无需重启，立刻生效。</p>
     </div></div>
     <div class="warn"><b>以后所有操作都用这同一个文件夹。</b>脚本按「自己所在的目录」找配置，换个文件夹双击就会报「未找到配置文件」；文件夹也不要改名或移动——开机自启里记着它的路径。</div>
     <div class="tip"><b>想确认保活是不是真的在跑</b>：双击 <span class="file">诊断检测.bat</span>，看<b>第 5 项</b>是否显示「运行中」；<b>第 6 项</b>会告诉你开机自启指向的是哪个目录。想直观验证重连，双击 <span class="file">注销测试.bat</span> 把自己踢下线，等十几秒看是否自动恢复。</div>
@@ -84,7 +84,7 @@
       <tr><th>文件</th><th>作用</th></tr>
       <tr><td><span class="file">重新配置账号.bat</span></td><td>首次使用 / 改密码时运行，重新填写学号密码</td></tr>
       <tr><td><span class="file">校园网登录.bat</span></td><td>手动登录一次（带窗口，能看结果），测试用</td></tr>
-      <tr><td><span class="file">安装开机自启.bat</span></td><td>设置开机自动后台保活（注册表方式，无需管理员权限），并立即启动守护，<b>推荐</b></td></tr>
+      <tr><td><span class="file">安装开机自启.bat</span></td><td>设置开机自动后台保活（计划任务方式，无需管理员权限），并立即启动守护，<b>推荐</b></td></tr>
       <tr><td><span class="file">启动后台保活.bat</span></td><td>临时手动启动一次后台守护（已运行时会自动跳过，不会重复启动）</td></tr>
       <tr><td><span class="file">卸载开机自启.bat</span></td><td>取消开机自启并结束守护进程</td></tr>
       <tr><td><span class="file">诊断检测.bat</span></td><td>一键诊断：在线状态、配置、<b>保活是否在运行</b>、<b>开机自启指向</b>（出问题先跑这个）</td></tr>

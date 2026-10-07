@@ -125,13 +125,20 @@
 
 ## 致谢
 
-本项目参考了 [YT-O5/GZIST_CampusNet_AutoLogin](https://github.com/YT-O5/GZIST_CampusNet_AutoLogin)
-的登录接口格式与整体设计思路，在此向原作者致谢。
+本项目的登录脚本有一段可以追溯的血缘链，向沿途的每一位作者致谢：
 
-- 该项目采用 MIT License，版权归 **ytt_pineapple** 所有（`Copyright (c) 2025 ytt_pineapple`）
-- 它使用的仍是 2026-09 学校认证系统升级**之前**的旧接口（`Portal&a=login`），在现行系统下已无法完成登录。
-  本项目在其基础上重写，适配了新版 `ePortal`（`ACSetting&a=Login`）接口，并增加了后台保活与诊断功能
-- 该仓库**并未删除，作者仍在维护**（其 README 现标注「过两天重做」）
+1. **gzist_tool**（[gzist-tool/gzist_CAN](https://github.com/gzist-tool/gzist_CAN)，已失效）
+   —— 目前可考的**最早作者**，写了最初的简版自动登录脚本（据上游作者称不到百行）。
+   该账号现已删除、仓库 404，具体身份不详
+2. **[YT-O5/GZIST_CampusNet_AutoLogin](https://github.com/YT-O5/GZIST_CampusNet_AutoLogin)**
+   —— 在 gzist_tool 的脚本基础上改进完善。MIT License，版权归 **ytt_pineapple** 所有
+   （`Copyright (c) 2025 ytt_pineapple`）。它使用的仍是 2026-09 学校认证系统升级**之前**的旧接口
+   （`Portal&a=login`），在现行系统下已无法完成登录
+3. **本项目 GZIST-NetKeeper** —— 在上游基础上重写，适配新版 `ePortal`（`ACSetting&a=Login`）接口，
+   并增加了后台保活与诊断功能
+
+> 上游作者 YT-O5 本人也于 2026-09 来本项目提了 [Issue #1](https://github.com/xiaomai1011/GZIST-NetKeeper/issues/1)
+> 确认了这段血缘关系，并表示会尽快把最早的那份百行源码重新打包上传。感谢这位较真的原作者！
 
 完整的版权与归属声明见 [NOTICE](NOTICE)。
 

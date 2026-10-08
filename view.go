@@ -33,6 +33,7 @@ type actions struct {
 	SetKeepAlive func(on bool)
 	Restart      func()
 	OpenLogs     func()
+	CopyLogs     func() // copies the log with personal data masked
 }
 
 // model is everything the main window shows. It is only touched on the
@@ -339,6 +340,9 @@ func (m *model) logCard(c *ui.Context, t *ui.Theme) {
 		ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
 			ui.Box(c).Size(8, 8).Radius(4).Background(colRana)
 			ui.Text(c, "灯的笔记本").FontSize(13).Bold().Grow(1)
+			if m.act.CopyLogs != nil && ui.Button(c, "复制脱敏日志").FontSize(12).Clicked() {
+				m.act.CopyLogs()
+			}
 			if m.act.OpenLogs != nil && ui.Button(c, "日志文件").FontSize(12).Clicked() {
 				m.act.OpenLogs()
 			}

@@ -5,12 +5,15 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/egoist/mygo"
+	"github.com/egoist/mygo/transfer"
 	"github.com/egoist/mygo/ui"
 	"github.com/xiaomai1011/GZIST-NetKeeper/internal/applog"
 	"github.com/xiaomai1011/GZIST-NetKeeper/internal/art"
@@ -123,6 +126,7 @@ func (a *app) ready() {
 		SetKeepAlive: a.setKeepAlive,
 		Restart:      a.restart,
 		OpenLogs:     func() { mygo.Shell.ShowItemInFolder(a.log.Path()) },
+		CopyLogs:     a.copyLogs,
 	}
 
 	a.client = portal.New(a.log.Add)
@@ -262,6 +266,24 @@ func (a *app) notify(title, body string) {
 			a.log.Printf("通知发送失败: %v", err)
 		}
 	})
+}
+
+// copyLogs puts the recent log on the clipboard with student IDs, IPs and
+// MACs masked, ready to paste into an Issue. The log file keeps the
+// original.
+func (a *app) copyLogs() {
+	account, _ := a.creds()
+	r := applog.Redactor{
+		Accounts: []string{account, a.m.saved},
+		KeepIPs:  append([]string{portal.DefaultPortalHost}, portal.DefaultACIPs...),
+	}
+	text := fmt.Sprintf("GZIST NetKeeper v%s (%s/%s)\n%s\n", mygo.App.Version(), runtime.GOOS, runtime.GOARCH,
+		strings.Join(r.Lines(a.log.Lines()), "\n"))
+	if err := mygo.Clipboard.Write(transfer.TextData(text)); err != nil {
+		a.log.Printf("复制日志失败: %v", err)
+		return
+	}
+	a.log.Add("已复制脱敏日志到剪贴板（学号、IP、MAC 已打码）")
 }
 
 func (a *app) diagnose() {

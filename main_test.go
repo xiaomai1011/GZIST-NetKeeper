@@ -113,6 +113,26 @@ func TestServerPauseShowsAdvice(t *testing.T) {
 	}
 }
 
+func TestCredentialPauseShowsMessage(t *testing.T) {
+	m := newModel(&recorder{})
+	m.saved = "a"
+	m.st = keeper.State{Phase: keeper.Offline, Pause: keeper.PausedByServer, LastError: "学号或密码错误", KeepAlive: true}
+	tt := ui.NewTester(m.view, 440, 780)
+	if !tt.HasText("学号或密码错误") {
+		t.Fatalf("texts %q", tt.Texts())
+	}
+}
+
+func TestCopyLogs(t *testing.T) {
+	copied := 0
+	m := newModel(&recorder{})
+	m.act.CopyLogs = func() { copied++ }
+	tt := ui.NewTester(m.view, 440, 780)
+	if err := tt.Click("复制脱敏日志"); err != nil || copied != 1 {
+		t.Fatal(err, copied)
+	}
+}
+
 func TestUpdateBanner(t *testing.T) {
 	restarted := false
 	m := newModel(&recorder{})

@@ -95,3 +95,15 @@ func (l *Log) Lines() []string {
 	defer l.mu.Unlock()
 	return append([]string(nil), l.lines...)
 }
+
+// Close closes the log file; later lines stay in memory only.
+func (l *Log) Close() error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.f == nil {
+		return nil
+	}
+	err := l.f.Close()
+	l.f = nil
+	return err
+}

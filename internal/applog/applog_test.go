@@ -9,6 +9,7 @@ import (
 func TestRingAndRotation(t *testing.T) {
 	dir := t.TempDir()
 	l := New(dir)
+	t.Cleanup(func() { l.Close() })
 	big := strings.Repeat("x", 4096)
 	for i := 0; i < 300; i++ {
 		l.Add(big)

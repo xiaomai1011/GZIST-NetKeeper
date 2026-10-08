@@ -2,6 +2,7 @@ package portal
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -201,12 +202,146 @@ func TestLoginAlreadyOnline(t *testing.T) {
 	}
 }
 
-func TestLoginNoResponse(t *testing.T) {
+func TestLoginCampusUnavailable(t *testing.T) {
 	f := newFake(t)
 	f.client.PortalBase = "http://127.0.0.1:1/eportal/"
+	start := time.Now()
 	_, err := f.client.Login(context.Background(), "a", "b")
-	if err != ErrNoResponse {
+	if !errors.Is(err, ErrCampusUnavailable) {
 		t.Fatalf("err=%v", err)
+	}
+	if d := time.Since(start); d > PreflightTimeout+time.Second {
+		t.Fatalf("took %v", d)
+	}
+}
+
+func TestLoginNoResponse(t *testing.T) {
+	f := newFake(t)
+	f.handler = func(map[string]string) string { panic(http.ErrAbortHandler) }
+	_, err := f.client.Login(context.Background(), "a", "b")
+	if !errors.Is(err, ErrNoResponse) {
+		t.Fatalf("err=%v", err)
+	}
+}
+
+func TestLoginBadCredentialStops(t *testing.T) {
+	f := newFake(t)
+	f.handler = func(map[string]string) string { return "<script>msga='ldap auth error'</script>" }
+	r, err := f.client.Login(context.Background(), "2023001", "wrong")
+	if err != nil || r.OK || r.Outcome != BadCredential || r.Msg != "ldap auth error" {
+		t.Fatalf("r=%+v err=%v", r, err)
+	}
+	if n := len(f.requests()); n != 1 {
+		t.Fatalf("bad password sent %d requests", n)
+	}
+}
+
+func TestLoginSuccessBeforeRouting(t *testing.T) {
+	f := newFake(t)
+	f.handler = func(map[string]string) string { return "<script>msga='认证成功'</script>" }
+	r, err := f.client.Login(context.Background(), "2023001", "x")
+	if err != nil || !r.OK || r.Warn == "" {
+		t.Fatalf("r=%+v err=%v", r, err)
+	}
+	if n := len(f.requests()); n != 1 {
+		t.Fatalf("login resubmitted: %d requests", n)
+	}
+}
+
+func TestLoginInUseStops(t *testing.T) {
+	f := newFake(t)
+	f.handler = func(map[string]string) string { return "<script>msga='inuse, login again'</script>" }
+	r, err := f.client.Login(context.Background(), "2023001", "x")
+	if err != nil || r.OK || r.Outcome != InUse {
+		t.Fatalf("r=%+v err=%v", r, err)
+	}
+	if n := len(f.requests()); n != 1 {
+		t.Fatalf("got %d requests", n)
+	}
+}
+
+func TestLoginMismatchSkipsProbe(t *testing.T) {
+	f := newFake(t)
+	sleeps := 0
+	f.client.Sleep = func(ctx context.Context, d time.Duration) error { sleeps++; return ctx.Err() }
+	f.handler = func(q map[string]string) string {
+		if q["c"] == "ACSetting" && q["DDDDD"] == "2023001" && q["wlanacip"] == "10.128.255.143" && q["wlanusermac"] == "AABBCCDDEEFF" {
+			return "<script>msga='认证成功'</script>"
+		}
+		return "<script>msga='mac, ip mismatch'</script>"
+	}
+	f.handler = withOnline(f, f.handler)
+	r, err := f.client.Login(context.Background(), "2023001", "x")
+	if err != nil || !r.OK {
+		t.Fatalf("r=%+v err=%v", r, err)
+	}
+	// Seven mismatches are skipped without waiting; only success() sleeps.
+	if n := len(f.requests()); n != 8 || sleeps != 1 {
+		t.Fatalf("%d requests, %d sleeps", n, sleeps)
+	}
+}
+
+// withOnline puts the fake online whenever h answers with success.
+func withOnline(f *fakeCampus, h func(map[string]string) string) func(map[string]string) string {
+	return func(q map[string]string) string {
+		body := h(q)
+		if o, _ := Classify(body); o == Success {
+			f.online.Store(true)
+		}
+		return body
+	}
+}
+
+func TestLoginRemembersCombination(t *testing.T) {
+	f := newFake(t)
+	f.handler = withOnline(f, func(q map[string]string) string {
+		if q["c"] == "ACSetting" && q["DDDDD"] == "2023001" && q["wlanacip"] == "10.128.255.143" && q["wlanusermac"] == "AABBCCDDEEFF" {
+			return "<script>msga='认证成功'</script>"
+		}
+		return "<script>msga='ac mismatch'</script>"
+	})
+	ctx := context.Background()
+	if r, err := f.client.Login(ctx, "2023001", "x"); err != nil || !r.OK {
+		t.Fatalf("r=%+v err=%v", r, err)
+	}
+	s, ok := f.client.LastSession()
+	want := Session{Suffixed: false, ACIP: "10.128.255.143", MACPlain: true, UserIP: "10.20.30.40", UserMAC: "AABBCCDDEEFF"}
+	if !ok || s != want {
+		t.Fatalf("session %+v", s)
+	}
+	f.online.Store(false)
+	f.mu.Lock()
+	f.reqs = nil
+	f.mu.Unlock()
+	if r, err := f.client.Login(ctx, "2023001", "x"); err != nil || !r.OK {
+		t.Fatalf("r=%+v err=%v", r, err)
+	}
+	if n := len(f.requests()); n != 1 {
+		t.Fatalf("reconnect took %d requests", n)
+	}
+}
+
+func TestClassify(t *testing.T) {
+	for _, c := range []struct {
+		body string
+		want Outcome
+	}{
+		{"<script>msga='认证成功'</script>", Success},
+		{"<title>认证成功页</title>", Success},
+		{"<script>msga='ldap auth error'</script>", BadCredential},
+		{"<script>msga='userid error1'</script>", BadCredential},
+		{"<script>msga='密码错误'</script>", BadCredential},
+		{"<script>msga='inuse, login again'</script>", InUse},
+		{"<script>msga='Rad:Limit Users Err'</script>", InUse},
+		{"<script>msga='mac不匹配'</script>", ParamMismatch},
+		{"<script>msga='AC认证失败'</script>", ParamMismatch},
+		{"<script>msga='error0'</script>", Unknown},
+		{"<html>hello</html>", Unknown},
+		{"", Unknown},
+	} {
+		if got, _ := Classify(c.body); got != c.want {
+			t.Errorf("Classify(%q) = %v, want %v", c.body, got, c.want)
+		}
 	}
 }
 
@@ -221,6 +356,33 @@ func TestLogout(t *testing.T) {
 	}
 	if err := f.client.Logout(context.Background(), "a"); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestLogoutUsesSession(t *testing.T) {
+	f := newFake(t)
+	f.client.ACIPs = nil
+	f.client.remember(Session{ACIP: "10.128.255.129", UserIP: "10.20.30.40", UserMAC: "AA-BB-CC-DD-EE-FF"})
+	f.handler = func(q map[string]string) string {
+		if q["c"] == "Portal" && q["a"] == "logout" && q["wlan_ac_ip"] == "10.128.255.129" && q["wlan_user_mac"] == "AA-BB-CC-DD-EE-FF" {
+			return `dr1003({"result":"1"})`
+		}
+		return ""
+	}
+	if err := f.client.Logout(context.Background(), "a"); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestLogoutNoACIPs(t *testing.T) {
+	f := newFake(t)
+	f.client.ACIPs = nil
+	f.handler = func(map[string]string) string { return "" }
+	if err := f.client.Logout(context.Background(), "a"); err == nil {
+		t.Fatal("unconfirmed logout reported success")
+	}
+	if n := len(f.requests()); n != 1 {
+		t.Fatalf("got %d requests", n)
 	}
 }
 

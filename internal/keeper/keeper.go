@@ -37,7 +37,7 @@ type Pause int
 const (
 	NotPaused Pause = iota
 	PausedByLogout
-	PausedByServer // ret_code 2 or 8: retrying would not help
+	PausedByServer // bad credentials, account in use, ret_code 2 or 8: retrying would not help
 )
 
 // Backoff is the wait after the n-th consecutive failure.
@@ -266,6 +266,15 @@ func (k *Keeper) login(ctx context.Context, manual bool) {
 				s.Online, s.NextRetry = false, now.Add(time.Minute)
 			}
 		})
+	case res.Outcome == portal.BadCredential || res.Outcome == portal.InUse:
+		msg := pauseAdvice(res)
+		k.log("登录失败（" + res.Outcome.String() + "），已暂停自动重试: " + msg)
+		k.update(func(s *State) {
+			s.Phase, s.Online, s.Pause, s.RetCode, s.LastError = Offline, false, PausedByServer, 0, msg
+		})
+		if k.Notify != nil {
+			k.Notify("校园网登录失败", msg)
+		}
 	case res.RetCode == 2 || res.RetCode == 8:
 		msg := portal.Advice(res.RetCode)
 		k.log("登录失败 ret_code=" + strconv.Itoa(res.RetCode) + "，已暂停自动重试: " + msg)
@@ -286,6 +295,20 @@ func (k *Keeper) login(ctx context.Context, manual bool) {
 		k.log("登录失败: " + msg)
 		k.fail(msg, res.RetCode)
 	}
+}
+
+// pauseAdvice explains a credential or in-use answer from ACSetting.
+func pauseAdvice(res portal.Result) string {
+	var msg string
+	if res.Outcome == portal.BadCredential {
+		msg = "学号或密码错误，请在「账号」中修改后保存。"
+	} else {
+		msg = portal.Advice(2)
+	}
+	if res.Msg != "" {
+		msg += "（服务器提示：" + res.Msg + "）"
+	}
+	return msg
 }
 
 func (k *Keeper) fail(msg string, code int) {

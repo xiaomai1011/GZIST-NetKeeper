@@ -33,6 +33,7 @@ type actions struct {
 	SetKeepAlive func(on bool)
 	Restart      func()
 	OpenLogs     func()
+	CopyLogs     func() // copies the log with personal data masked
 }
 
 // model is everything the main window shows. It is only touched on the
@@ -231,6 +232,9 @@ func (m *model) statusCard(c *ui.Context, t *ui.Theme, s status) {
 		if m.st.RetCode != 0 {
 			ui.Text(c, fmt.Sprintf("ret_code=%d：%s", m.st.RetCode, portal.Advice(m.st.RetCode))).
 				FontSize(12).Wrap().Padding(8, 10).Radius(8).Background(colSoyo.Alpha(0.22))
+		} else if m.st.Pause == keeper.PausedByServer && m.st.LastError != "" {
+			ui.Text(c, m.st.LastError).
+				FontSize(12).Wrap().Padding(8, 10).Radius(8).Background(colSoyo.Alpha(0.22))
 		}
 		ui.Grid(c).ColumnTracks(ui.Fixed(56), ui.Fr(1)).GapX(12).GapY(4).Children(func() {
 			kv := func(k, v string) {
@@ -336,6 +340,9 @@ func (m *model) logCard(c *ui.Context, t *ui.Theme) {
 		ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
 			ui.Box(c).Size(8, 8).Radius(4).Background(colRana)
 			ui.Text(c, "灯的笔记本").FontSize(13).Bold().Grow(1)
+			if m.act.CopyLogs != nil && ui.Button(c, "复制脱敏日志").FontSize(12).Clicked() {
+				m.act.CopyLogs()
+			}
 			if m.act.OpenLogs != nil && ui.Button(c, "日志文件").FontSize(12).Clicked() {
 				m.act.OpenLogs()
 			}

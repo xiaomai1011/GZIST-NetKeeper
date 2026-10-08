@@ -3,6 +3,7 @@
 package applog
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -50,6 +51,32 @@ func (l *Log) open() {
 	}
 }
 
+// rotate moves the full log to <name>.1, replacing an older one. Windows
+// cannot rename over an existing file that is open elsewhere, so the old
+// copy is removed first. If the move still fails the file is truncated
+// rather than left to grow. Called with l.mu held.
+func (l *Log) rotate() {
+	l.f.Close()
+	l.f = nil
+	old := l.path + ".1"
+	if err := os.Remove(old); err != nil && !errors.Is(err, os.ErrNotExist) {
+		l.warn("删除旧日志 %s 失败: %v", old, err)
+	}
+	if err := os.Rename(l.path, old); err != nil {
+		l.warn("日志轮转失败: %v", err)
+		if err := os.Truncate(l.path, 0); err != nil {
+			l.warn("清空日志失败: %v", err)
+		}
+	}
+	l.size = 0
+	l.open()
+}
+
+// warn records a problem with the log file itself, in memory only.
+func (l *Log) warn(format string, args ...any) {
+	l.lines = append(l.lines, l.now().Format("15:04:05")+"  "+fmt.Sprintf(format, args...))
+}
+
 // Path is the log file, or "" when logging to memory only.
 func (l *Log) Path() string { return l.path }
 
@@ -76,10 +103,7 @@ func (l *Log) Add(msg string) {
 		n, _ := fmt.Fprintf(l.f, "%s  %s\n", t.Format("2006-01-02 15:04:05"), msg)
 		l.size += int64(n)
 		if l.size > MaxSize {
-			l.f.Close()
-			os.Rename(l.path, l.path+".1")
-			l.size = 0
-			l.open()
+			l.rotate()
 		}
 	}
 	fn := l.onChange

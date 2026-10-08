@@ -3,133 +3,74 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>GZIST-NetKeeper · 广州理工学院校园网自动登录保活工具</title>
-<meta name="description" content="广州理工学院校园网自动登录与保活工具：适配 2026-09 学校认证系统升级后的新接口（Dr.COM / eportal），掉线自动重连、开机自启、无窗口后台运行。">
+<title>GZIST NetKeeper · 广州理工学院校园网自动登录保活客户端</title>
+<meta name="description" content="广州理工学院校园网自动登录与保活客户端，macOS / Windows / Linux 三端托盘应用，掉线自动重连、开机自启、自动更新。">
+<link rel="icon" href="resources/icon.png">
 <style>
-  :root{
-    --bg:#f6f8fa; --card:#ffffff; --border:#e2e8f0; --text:#1e293b;
-    --muted:#64748b; --accent:#2563eb; --ok:#16a34a; --warn:#d97706; --err:#dc2626;
-  }
+  :root{--band:#3388BB;--tomori:#77BBDD;--anon:#FF8899;--rana:#77DD77;--soyo:#FFDD88;--taki:#7777AA;
+    --bg:#eef4f9;--card:#fff;--text:#1d2b3a;--muted:#5f7184;--border:#d5e2ee}
+  @media (prefers-color-scheme:dark){:root{--bg:#111a24;--card:#18222e;--text:#e6eef6;--muted:#8fa3b6;--border:#2a3a4a}}
   *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:"Microsoft YaHei","PingFang SC",sans-serif;background:var(--bg);color:var(--text);line-height:1.75;padding:32px 16px}
-  .wrap{max-width:860px;margin:0 auto}
-  h1{font-size:26px;margin-bottom:6px}
-  .sub{color:var(--muted);margin-bottom:18px;font-size:14px}
-  .cta{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:26px}
-  .btn{display:inline-block;background:var(--accent);color:#fff;text-decoration:none;padding:9px 20px;border-radius:8px;font-weight:600;font-size:14.5px}
-  .btn.ghost{background:#fff;color:var(--accent);border:1px solid #bfdbfe}
-  .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:24px 28px;margin-bottom:20px}
-  h2{font-size:18px;margin-bottom:14px;padding-left:12px;border-left:4px solid var(--accent)}
-  p{margin-bottom:10px;font-size:14.5px}
-  ol,ul{padding-left:24px;font-size:14.5px}
-  li{margin-bottom:8px}
-  .file{font-family:Consolas,monospace;background:#eef2ff;color:#3730a3;padding:2px 8px;border-radius:5px;font-size:13.5px;white-space:nowrap}
-  code{font-family:Consolas,monospace;background:#f1f5f9;padding:1px 6px;border-radius:4px;font-size:13px}
-  .tip{border-left:4px solid var(--ok);background:#f0fdf4;padding:10px 14px;border-radius:0 8px 8px 0;font-size:14px;margin:12px 0}
-  .warn{border-left:4px solid var(--warn);background:#fffbeb;padding:10px 14px;border-radius:0 8px 8px 0;font-size:14px;margin:12px 0}
-  table{width:100%;border-collapse:collapse;font-size:14px;margin-top:8px}
-  th,td{border:1px solid var(--border);padding:8px 12px;text-align:left;vertical-align:top}
-  th{background:#f8fafc;font-weight:600}
-  .step{display:flex;gap:14px;margin-bottom:16px}
-  .step .num{flex:0 0 30px;height:30px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px}
-  .step .body{flex:1}
-  .step .body b{display:block;margin-bottom:2px}
-  .note{color:var(--muted);font-size:13px}
-  img.demo{width:100%;display:block;border-radius:10px;border:1px solid var(--border);margin-top:10px}
-  footer{text-align:center;color:var(--muted);font-size:13px;padding:8px 0 24px}
-  footer a{color:var(--accent);text-decoration:none}
+  body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--text);line-height:1.7}
+  header{background:linear-gradient(120deg,#2E7DB0,#5FA9D6);color:#fff;padding:48px 20px 40px;text-align:center}
+  header img{width:96px;height:96px}
+  header h1{font-size:32px;margin-top:8px}
+  header p{opacity:.9}
+  .stripe{display:flex;height:5px}.stripe i{flex:1}
+  .wrap{max-width:900px;margin:0 auto;padding:28px 18px}
+  .dl{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin-bottom:26px}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:20px 22px}
+  .card h3{margin-bottom:6px}
+  .card p{color:var(--muted);font-size:14px}
+  .btn{display:inline-block;margin-top:12px;background:var(--band);color:#fff;text-decoration:none;padding:8px 18px;border-radius:10px;font-weight:600}
+  h2{font-size:20px;margin:26px 0 12px}
+  h2::before{content:"★ ";color:var(--band)}
+  .shots{display:flex;gap:14px;overflow-x:auto}
+  .shots img{width:280px;border-radius:14px;border:1px solid var(--border)}
+  ul{padding-left:22px}li{margin-bottom:6px}
+  code{background:rgba(51,136,187,.12);padding:1px 6px;border-radius:5px;font-size:13px}
+  footer{text-align:center;color:var(--muted);font-size:13px;padding:24px}
+  a{color:var(--band)}
 </style>
 </head>
 <body>
+<header>
+  <img src="resources/icon.png" alt="">
+  <h1>GZIST NetKeeper</h1>
+  <p>迷子でもいい、迷子でも進め。—— 广州理工学院校园网自动登录保活客户端</p>
+</header>
+<div class="stripe"><i style="background:var(--tomori)"></i><i style="background:var(--anon)"></i><i style="background:var(--rana)"></i><i style="background:var(--soyo)"></i><i style="background:var(--taki)"></i></div>
 <div class="wrap">
-
-  <h1>广州理工学院 · 校园网自动登录保活工具</h1>
-  <div class="sub">支持 WiFi / 有线 · 开机自启 · 休眠唤醒自动重连 · 零依赖（无需安装任何软件）</div>
-
-  <div class="cta">
-    <a class="btn" href="https://github.com/xiaomai1011/GZIST-NetKeeper/releases/latest">↓ 下载最新版 ZIP</a>
-    <a class="btn ghost" href="https://github.com/xiaomai1011/GZIST-NetKeeper">查看 GitHub 仓库</a>
+  <div class="dl">
+    <div class="card"><h3>macOS</h3><p>Apple 芯片 / Intel · .dmg<br>首次打开：系统设置 → 隐私与安全性 → 仍要打开</p>
+      <a class="btn" href="https://github.com/zzstar101/GZIST-NetKeeper-MyGo/releases/latest">下载</a></div>
+    <div class="card"><h3>Windows 10 / 11</h3><p>x64 / ARM64 · 安装包，无需管理员<br>SmartScreen：更多信息 → 仍要运行</p>
+      <a class="btn" href="https://github.com/zzstar101/GZIST-NetKeeper-MyGo/releases/latest">下载</a></div>
+    <div class="card"><h3>Linux</h3><p>x64 / ARM64 · .deb 或 install.sh<br>托盘需要 libayatana-appindicator3</p>
+      <a class="btn" href="https://github.com/zzstar101/GZIST-NetKeeper-MyGo/releases/latest">下载</a></div>
   </div>
-
-  <div class="card">
-    <h2>一、快速上手（只需 3 步）</h2>
-    <div class="step"><div class="num">1</div><div class="body">
-      <b>解压 + 配置账号</b>
-      <p>把下载的 ZIP 解压到一个固定文件夹（例如 <code>D:\GZIST-NetKeeper\</code>），双击 <span class="file">重新配置账号.bat</span>，输入学号和校园网密码（输密码时屏幕上不显示，正常输入后回车即可）。</p>
-    </div></div>
-    <div class="step"><div class="num">2</div><div class="body">
-      <b>测试登录</b>
-      <p>先手动注销校园网（浏览器打开 <code>10.0.10.252</code> 点注销），再双击 <span class="file">校园网登录.bat</span>。看到绿色的「登录成功」就说明配置正确。</p>
-    </div></div>
-    <div class="step"><div class="num">3</div><div class="body">
-      <b>安装开机自启</b>
-      <p>双击 <span class="file">安装开机自启.bat</span>。之后每次登录 Windows 会自动在后台启动保活守护，重启、休眠唤醒后掉线也会自动重连（通常半分钟内恢复上网）。装完无需重启，立刻生效。</p>
-    </div></div>
-    <div class="warn"><b>以后所有操作都用这同一个文件夹。</b>脚本按「自己所在的目录」找配置，换个文件夹双击就会报「未找到配置文件」；文件夹也不要改名或移动——开机自启里记着它的路径。</div>
-    <div class="tip"><b>想确认保活是不是真的在跑</b>：双击 <span class="file">诊断检测.bat</span>，看<b>第 5 项</b>是否显示「运行中」；<b>第 6 项</b>会告诉你开机自启指向的是哪个目录。想直观验证重连，双击 <span class="file">注销测试.bat</span> 把自己踢下线，等十几秒看是否自动恢复。</div>
-    <div class="tip"><b>已实测</b>：2026-09-18 学校认证系统升级后完成验收测试 —— 主动注销下线 → 23 秒自动恢复 → 验证通过；守护自愈测试同样 PASS。检测使用 HTTPS 证书校验，校园网未认证时的 HTTP 劫持 / 白名单放行都不会造成误判。</div>
-    <img class="demo" src="docs/demo.svg" alt="实测日志：注销下线后 23 秒自动恢复">
-    <p class="note">上图为本项目 2026-09-18 的真实测试日志（学号、IP、MAC 已隐去）。</p>
+  <div class="shots">
+    <img src="docs/screenshots/main.png" alt="主窗口">
+    <img src="docs/screenshots/tray.png" alt="托盘菜单">
   </div>
-
-  <div class="card">
-    <h2>二、这个工具解决什么问题</h2>
-    <p>学校的认证服务器（10.0.10.252）在电脑重启、休眠唤醒、WiFi 重连后会删除登录会话，所以每次都要重新打开网页输账号密码。这个工具会在后台默默检查网络：<b>一旦发现掉线，就自动向认证服务器发送登录请求</b>，全程无需你操作。</p>
-    <p class="note">原理：调用学校认证系统的 eportal 新版接口（<code>ACSetting&amp;a=Login</code>），自动检测本机 IP 和 MAC 地址并携带账号密码完成认证，并紧跟网关 302 跳转携带权威参数。旧的 <code>Portal&amp;a=login</code> 接口在 2026-09 学校升级后已全部返回 500，本项目已适配。</p>
-  </div>
-
-  <div class="card">
-    <h2>三、文件说明</h2>
-    <table>
-      <tr><th>文件</th><th>作用</th></tr>
-      <tr><td><span class="file">重新配置账号.bat</span></td><td>首次使用 / 改密码时运行，重新填写学号密码</td></tr>
-      <tr><td><span class="file">校园网登录.bat</span></td><td>手动登录一次（带窗口，能看结果），测试用</td></tr>
-      <tr><td><span class="file">安装开机自启.bat</span></td><td>设置开机自动后台保活（计划任务方式，无需管理员权限），并立即启动守护，<b>推荐</b></td></tr>
-      <tr><td><span class="file">启动后台保活.bat</span></td><td>临时手动启动一次后台守护（已运行时会自动跳过，不会重复启动）</td></tr>
-      <tr><td><span class="file">卸载开机自启.bat</span></td><td>取消开机自启并结束守护进程</td></tr>
-      <tr><td><span class="file">诊断检测.bat</span></td><td>一键诊断：在线状态、配置、<b>保活是否在运行</b>、<b>开机自启指向</b>（出问题先跑这个）</td></tr>
-      <tr><td><span class="file">注销测试.bat</span></td><td>一键注销校园网（调认证服务器接口），用来验证自动重连效果</td></tr>
-      <tr><td><span class="file">campus_net.ps1</span></td><td>核心脚本（自动改密码不用动它）</td></tr>
-      <tr><td><span class="file">campusnet_log.txt</span></td><td>运行日志（自动生成，出问题先看它）</td></tr>
-      <tr><td><span class="file">campusnet_config.json</span></td><td>保存你的账号密码（自动生成）</td></tr>
-    </table>
-    <p class="note">另有 install_autostart.ps1、logout.ps1、silent_start.vbs 三个内部脚本，由 bat 自动调用，不需要手动运行。</p>
-  </div>
-
-  <div class="card">
-    <h2>四、常见问题</h2>
-    <table>
-      <tr><th>现象</th><th>解决办法</th></tr>
-      <tr><td>登录失败 ret_code=8</td><td>先在手机或其他设备上打开 10.0.10.252 点「注销」把本机下线；再按 Win+R 输入 cmd，依次执行 <code>ipconfig /release</code> 和 <code>ipconfig /renew</code>，然后重新运行登录</td></tr>
-      <tr><td>登录失败 ret_code=2</td><td>账号在别处登录了，先把其他设备下线</td></tr>
-      <tr><td>提示未检测到网卡</td><td>先插网线或连上校园网 WiFi，再运行脚本</td></tr>
-      <tr><td>改了校园网密码</td><td>双击 <span class="file">重新配置账号.bat</span> 重新填一次</td></tr>
-      <tr><td>开着 VPN（尤其 TUN 模式）时检测不准、掉线后不自动重连</td><td>VPN 的 TUN 模式会接管系统路由，把发往校园网关的请求也吞进隧道，于是掉线时捕获不到网关的 302 跳转（登录必需的 <code>wlanuserip</code> / <code>wlanusermac</code> / <code>wlanacip</code> 参数就在其中），登录无法完成，在线判断也会失真（可能显示在线其实已掉线）。<b>测试和日常使用请先关闭 VPN</b>，只保留校园网本身的连接</td></tr>
-      <tr><td>休眠唤醒后过了一会儿才恢复</td><td>正常现象。守护每 10 秒检测一次，通常 15~30 秒内恢复；重启 / 休眠唤醒后网卡重新初始化较慢，最多约 1 分钟</td></tr>
-      <tr><td>想确认后台在不在运行</td><td>运行 <span class="file">诊断检测.bat</span>，看<b>第 5 项</b>：显示「运行中」就是真的在跑（用命名互斥锁判断，比看进程列表准）。没在跑就双击 <span class="file">启动后台保活.bat</span></td></tr>
-      <tr><td>想改检测间隔</td><td>编辑 campus_net.ps1 里的 <code>$CheckInterval</code>（单位秒，默认 10）。不建议设得过短</td></tr>
-      <tr><td>怎么彻底卸载</td><td>先运行 <span class="file">卸载开机自启.bat</span>，再删掉整个文件夹即可</td></tr>
-    </table>
-  </div>
-
-  <div class="card">
-    <h2>五、安全须知</h2>
-    <ul>
-      <li>密码保存在本机 <span class="file">campusnet_config.json</span> 里（仅 Base64 编码混淆，<b>不是加密</b>）。<b>分享本工具给别人时，不要把自己的 campusnet_config.json 和 campusnet_log.txt 一起发出去</b>（GitHub Release 里的压缩包已排除这两个文件）。</li>
-      <li>脚本只向你学校的认证服务器（10.0.10.252）发送登录请求，不上传任何数据到其他地方。</li>
-      <li>仅供个人学习交流使用，请遵守学校网络使用规定；如学校再次更换认证系统，脚本需要相应更新。</li>
-    </ul>
-  </div>
-
-  <footer>
-    开源项目 · MIT License ·
-    <a href="https://github.com/xiaomai1011/GZIST-NetKeeper">xiaomai1011/GZIST-NetKeeper</a>
-    <br>
-    血缘：gzist-tool/gzist_CAN（最早来源，已失效）→
-    <a href="https://github.com/YT-O5/GZIST_CampusNet_AutoLogin">YT-O5/GZIST_CampusNet_AutoLogin</a>
-    （MIT · Copyright (c) 2025 ytt_pineapple）→ 本项目 —— 上游用旧接口（2026-09 学校升级后失效），本项目适配了新版接口
-  </footer>
-
+  <h2>三步上手</h2>
+  <ul>
+    <li>安装并打开，在「账号」里填写学号和校园网密码，点「保存」，程序会立即登录。</li>
+    <li>打开「设置 → 开机自启」，之后开机会在后台运行，不弹窗口。</li>
+    <li>平时看托盘图标即可：实心星表示在线，空心星表示离线，带「!」表示需要处理。</li>
+  </ul>
+  <h2>常见问题</h2>
+  <ul>
+    <li><b>ret_code=8</b>：密码错误，或 IP/MAC 对不上。用手机连校园网打开 <code>10.0.10.252</code> 注销本机，断开 Wi-Fi 重连后再点「立即登录」。</li>
+    <li><b>ret_code=2</b>：账号已在其他设备登录，先在那台设备注销。</li>
+    <li><b>开着 VPN 检测不准</b>：TUN 模式会接管路由，请先关闭 VPN。</li>
+    <li><b>从旧版脚本升级</b>：先在旧文件夹双击 <code>卸载开机自启.bat</code>，再删除旧文件夹。</li>
+  </ul>
+  <p style="margin-top:14px">更多说明见 <a href="https://github.com/zzstar101/GZIST-NetKeeper-MyGo#readme">README</a>。</p>
 </div>
+<footer>
+  it's MyGO!!!!! · <a href="https://github.com/zzstar101/GZIST-NetKeeper-MyGo">GitHub</a> · MIT License<br>
+  仅适配广州理工学院校园网，请遵守学校网络使用规定
+</footer>
 </body>
 </html>

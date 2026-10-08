@@ -1,19 +1,15 @@
-# 隐私文件: 含账号密码/日志, 严禁上传
-campusnet_config.json
-campusnet_log.txt
-断网重连测试结果.txt
+/build/
+/.mygo/
+mygo_windows_*.syso
 
-# 临时与测试文件
-_*
-*_test*
-*.log
-*.tmp
+# 更新签名私钥，严禁提交
+mygo-update.key
 
-# 维护者本地文件 (仓库维护用, 不对外公开)
+# 维护者本地文件
 一键推送GitHub.bat
 一键更新并推送.bat
 仓库信息_复制粘贴用.txt
 
-# 系统文件
+.DS_Store
 Thumbs.db
 desktop.ini

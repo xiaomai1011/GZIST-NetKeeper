@@ -71,3 +71,17 @@ func TestPasswordKeyringAndFallback(t *testing.T) {
 		t.Fatal(p)
 	}
 }
+
+func TestPasswordMigratesLegacyService(t *testing.T) {
+	k := &memKeyring{m: map[string]string{legacyService + "/a": "old"}}
+	s := &Store{Dir: t.TempDir(), Keyring: k}
+	if p, insecure, _ := s.Password("a"); p != "old" || insecure {
+		t.Fatal(p, insecure)
+	}
+	if k.m[service+"/a"] != "old" {
+		t.Fatalf("not migrated: %v", k.m)
+	}
+	if _, ok := k.m[legacyService+"/a"]; ok {
+		t.Fatalf("legacy entry kept: %v", k.m)
+	}
+}

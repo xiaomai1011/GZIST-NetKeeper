@@ -76,6 +76,14 @@ func (a *app) ready() {
 	a.store = store.New(dataDir)
 	a.log.Printf("GZIST NetKeeper v%s 启动 (%s/%s)", mygo.App.Version(), runtime.GOOS, runtime.GOARCH)
 
+	if removeLegacyAutostart() {
+		if err := mygo.App.SetOpenAtLogin(true); err != nil {
+			a.log.Printf("迁移开机自启失败: %v", err)
+		} else {
+			a.log.Printf("已迁移旧版本的开机自启设置")
+		}
+	}
+
 	st := a.store.Load()
 	pw, insecure, err := a.store.Password(st.Account)
 	if err != nil {

@@ -12,7 +12,12 @@ import (
 	"github.com/zalando/go-keyring"
 )
 
-const service = "io.github.zzstar101.gzist-netkeeper"
+const service = "io.github.xiaomai1011.gzist-netkeeper"
+
+// legacyService is the credential service of 2.0.0, released under the
+// identifier io.github.zzstar101.gzist-netkeeper; Password moves its
+// entries to service.
+const legacyService = "io.github.zzstar101.gzist-netkeeper"
 
 // Settings are saved as settings.json in the user data directory.
 type Settings struct {
@@ -83,6 +88,12 @@ func (s *Store) Password(account string) (password string, insecure bool, err er
 	if p, err := s.Keyring.Get(service, account); err == nil {
 		return p, false, nil
 	}
+	if p, err := s.Keyring.Get(legacyService, account); err == nil {
+		if s.Keyring.Set(service, account, p) == nil {
+			s.Keyring.Delete(legacyService, account)
+		}
+		return p, false, nil
+	}
 	b, err := os.ReadFile(s.secretPath())
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -97,6 +108,7 @@ func (s *Store) Password(account string) (password string, insecure bool, err er
 func (s *Store) DeletePassword(account string) {
 	if account != "" {
 		s.Keyring.Delete(service, account)
+		s.Keyring.Delete(legacyService, account)
 	}
 	os.Remove(s.secretPath())
 }

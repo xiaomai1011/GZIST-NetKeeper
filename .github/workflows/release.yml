@@ -64,11 +64,41 @@ jobs:
       - name: Install NSIS
         if: matrix.name == 'Windows'
         run: sudo apt-get update && sudo apt-get install -y nsis
-      - name: Build and upload
-        run: go tool mygo build -platform "${{ matrix.platform }}" -upload
+      - name: Build
+        run: go tool mygo build -platform "${{ matrix.platform }}"
         env:
           GH_TOKEN: ${{ github.token }}
           MYGO_UPDATER_PRIVATE_KEY: ${{ secrets.MYGO_UPDATER_PRIVATE_KEY }}
+      # mygo build names the installers of every architecture the same
+      # ("GZIST NetKeeper 2.0.0.dmg", "GZIST NetKeeper Setup 2.0.0.exe"), so
+      # -upload would overwrite one with the other. Give them arch-specific
+      # names and upload like -upload does: files first, manifests last.
+      - name: Rename installers and upload
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          version="$(jq -r .version mygo.json)"
+          files=(); manifests=()
+          for dir in build/*/; do
+            target="$(basename "$dir")"            # e.g. darwin-arm64
+            os="${target%-*}"; arch="${target#*-}"
+            [ "$arch" = amd64 ] && arch=x64
+            for f in "$dir"*.dmg; do
+              n="${dir}GZIST-NetKeeper-${version}-macos-${arch}.dmg"; mv "$f" "$n"; files+=("$n")
+            done
+            for f in "$dir"*" Setup "*.exe; do
+              n="${dir}GZIST-NetKeeper-${version}-windows-${arch}-setup.exe"; mv "$f" "$n"; files+=("$n")
+            done
+            for f in "$dir"*.deb "$dir"*.tar.gz "$dir"*.delta; do files+=("$f"); done
+            if [ -f "${dir}install.sh" ] && [[ " ${files[*]} " != *"install.sh"* ]]; then files+=("${dir}install.sh"); fi
+            for f in "$dir"update-*.json; do manifests+=("$f"); done
+          done
+          printf 'file: %s\n' "${files[@]}" "${manifests[@]}"
+          gh release upload "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --clobber "${files[@]}"
+          gh release upload "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --clobber "${manifests[@]}"
 
   publish:
     needs: build

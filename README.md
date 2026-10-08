@@ -35,13 +35,13 @@
 
 ## 📦 安装
 
-到 **[Releases 页面](https://github.com/zzstar101/GZIST-NetKeeper-MyGo/releases/latest)** 下载对应系统的文件。文件名里的 `arm64` / `amd64` 对应 CPU 架构：
+到 **[Releases 页面](https://github.com/zzstar101/GZIST-NetKeeper-MyGo/releases/latest)** 下载对应系统的文件。文件名里的 `x64` / `amd64` 是常见的 Intel、AMD 电脑，`arm64` 是 Apple M 系列芯片和 ARM 电脑：
 
 | 系统 | 选哪个文件 | 怎么装 |
 |---|---|---|
-| **Windows 10 / 11** | `GZIST NetKeeper Setup x.y.z.exe`（大多数电脑选 amd64 / x64） | 双击安装，**不需要管理员权限** |
-| **macOS** | `.dmg`（M 系列芯片选 arm64，Intel 选 amd64） | 打开 dmg，把 App 拖进「应用程序」 |
-| **Linux（Debian / Ubuntu）** | `gzist-netkeeper_x.y.z_amd64.deb` | `sudo apt install ./gzist-netkeeper_*.deb` |
+| **Windows 10 / 11** | `GZIST-NetKeeper-x.y.z-windows-x64-setup.exe`（骁龙等 ARM 电脑选 `arm64`） | 双击安装，**不需要管理员权限** |
+| **macOS** | `GZIST-NetKeeper-x.y.z-macos-arm64.dmg`（M 系列芯片）/ `-macos-x64.dmg`（Intel） | 打开 dmg，把 App 拖进「应用程序」 |
+| **Linux（Debian / Ubuntu）** | `gzist-netkeeper_x.y.z_amd64.deb`（ARM 选 `arm64`） | `sudo apt install ./gzist-netkeeper_*.deb` |
 | **Linux（其他发行版）** | 无需下载，一行命令安装（会自动更新） | `curl -fsSL https://github.com/zzstar101/GZIST-NetKeeper-MyGo/releases/latest/download/install.sh \| sh` |
 
 ### 第一次打开被系统拦住？
@@ -213,7 +213,7 @@ go run ./tools/genicon               # 重新生成 resources/icon.png
 **发布**：所有安装包都由 GitHub Actions 构建，不从本机上传。流程如下：
 
 1. 修改 `mygo.json` 中的 `version`，提交后打标签并推送，例如 `git tag v2.0.1 && git push origin main v2.0.1`；
-2. [release.yml](.github/workflows/release.yml) 会先跑测试，再构建 6 个目标，签名后上传到同名的 Release 草稿；
+2. [release.yml](.github/workflows/release.yml) 会先检查标签和 `version` 是否一致并跑测试，然后构建 6 个目标、签名，给安装包加上架构后缀，再上传到同名的 Release 草稿；
 3. 构建全部成功后，CI 会自动发布这个 Release。已安装的客户端从 `releases/latest` 读取更新清单，完成自动更新。
 
 更新签名使用 `mygo.json` 里 `updates.publicKey` 对应的私钥，私钥保存在仓库 Secret `MYGO_UPDATER_PRIVATE_KEY` 中。**私钥丢失后，已安装的客户端将无法再自动更新**，请妥善备份。

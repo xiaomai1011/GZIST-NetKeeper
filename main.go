@@ -44,13 +44,16 @@ type app struct {
 
 	onlineOnce  sync.Once
 	firstOnline chan struct{}
+
+	// disk runs settings and keyring writes one at a time, in order.
+	disk chan func()
 }
 
 func main() {
 	if !mygo.App.RequestSingleInstanceLock() {
 		return // the running instance opens its window
 	}
-	a := &app{firstOnline: make(chan struct{})}
+	a := &app{firstOnline: make(chan struct{}), disk: make(chan func(), 16)}
 	mygo.App.OnSecondInstance(func([]string, string) { a.showWindow() })
 	// Closing the window keeps the keepalive running in the tray.
 	mygo.App.OnWindowAllClosed(func() {})
@@ -84,7 +87,16 @@ func (a *app) ready() {
 		}
 	}
 
-	st := a.store.Load()
+	go func() {
+		for fn := range a.disk {
+			fn()
+		}
+	}()
+
+	st, loadErr := a.store.Load()
+	if loadErr != nil {
+		a.log.Printf("读取设置失败，已使用默认设置: %v", loadErr)
+	}
 	pw, insecure, err := a.store.Password(st.Account)
 	if err != nil {
 		a.log.Printf("读取密码失败: %v", err)
@@ -98,6 +110,9 @@ func (a *app) ready() {
 		keepAlive:   st.KeepAlive,
 		autostart:   mygo.App.OpenAtLogin(),
 		version:     mygo.App.Version(),
+	}
+	if loadErr != nil {
+		a.m.notice = "设置文件损坏，已使用默认设置，请重新保存账号"
 	}
 	a.m.act = actions{
 		Login:        func() { a.keeper.Login() },
@@ -261,18 +276,11 @@ func (a *app) save(account, password string) {
 		return
 	}
 	a.m.notice = "保存中…"
-	keepAlive := a.m.keepAlive
-	go func() {
-		if old != "" && old != account {
-			a.store.DeletePassword(old)
-		}
-		insecure := a.m.insecure
-		var err error
+	insecure := a.m.insecure
+	a.disk <- func() {
+		ins, err := a.store.SaveAccount(account, password)
 		if password != "" {
-			insecure, err = a.store.SetPassword(account, password)
-		}
-		if err == nil {
-			err = a.store.Save(store.Settings{Account: account, KeepAlive: keepAlive})
+			insecure = ins
 		}
 		if err != nil {
 			a.log.Printf("保存失败: %v", err)
@@ -295,7 +303,7 @@ func (a *app) save(account, password string) {
 			a.syncTray()
 		})
 		a.keeper.AccountChanged()
-	}()
+	}
 }
 
 func (a *app) setAutostart(on bool) {
@@ -317,8 +325,11 @@ func (a *app) setAutostart(on bool) {
 func (a *app) setKeepAlive(on bool) {
 	a.m.keepAlive = on
 	a.keeper.SetKeepAlive(on)
-	account := a.m.saved
-	go a.store.Save(store.Settings{Account: account, KeepAlive: on})
+	a.disk <- func() {
+		if err := a.store.Update(func(st *store.Settings) { st.KeepAlive = on }); err != nil {
+			a.log.Printf("保存设置失败: %v", err)
+		}
+	}
 }
 
 func (a *app) restart() {

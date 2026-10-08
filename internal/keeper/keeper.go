@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/zzstar101/GZIST-NetKeeper-MyGo/internal/portal"
+	"github.com/xiaomai1011/GZIST-NetKeeper/internal/portal"
 )
 
 // Portal is what the keeper needs from the protocol client.

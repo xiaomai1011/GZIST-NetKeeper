@@ -12,16 +12,16 @@ import (
 
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
-	"github.com/zzstar101/GZIST-NetKeeper-MyGo/internal/applog"
-	"github.com/zzstar101/GZIST-NetKeeper-MyGo/internal/art"
-	"github.com/zzstar101/GZIST-NetKeeper-MyGo/internal/keeper"
-	"github.com/zzstar101/GZIST-NetKeeper-MyGo/internal/portal"
-	"github.com/zzstar101/GZIST-NetKeeper-MyGo/internal/store"
+	"github.com/xiaomai1011/GZIST-NetKeeper/internal/applog"
+	"github.com/xiaomai1011/GZIST-NetKeeper/internal/art"
+	"github.com/xiaomai1011/GZIST-NetKeeper/internal/keeper"
+	"github.com/xiaomai1011/GZIST-NetKeeper/internal/portal"
+	"github.com/xiaomai1011/GZIST-NetKeeper/internal/store"
 )
 
 const (
 	appTitle    = "GZIST NetKeeper"
-	releasesURL = "https://github.com/zzstar101/GZIST-NetKeeper-MyGo/releases/latest"
+	releasesURL = "https://github.com/xiaomai1011/GZIST-NetKeeper/releases/latest"
 	updateEvery = 6 * time.Hour
 )
 

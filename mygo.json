@@ -6,7 +6,7 @@
   "out": "build",
   "updates": {
     "publicKey": "bX0o26sICXPZNejUCcYNBp0vBDx0fkuWblUPOuOrTs0=",
-    "github": "zzstar101/GZIST-NetKeeper-MyGo"
+    "github": "xiaomai1011/GZIST-NetKeeper"
   },
   "linux": {
     "maintainer": "zzstar101 <zzstar101@users.noreply.github.com>",

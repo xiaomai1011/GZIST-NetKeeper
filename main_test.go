@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/egoist/mygo/ui"
-	"github.com/zzstar101/GZIST-NetKeeper-MyGo/internal/keeper"
-	"github.com/zzstar101/GZIST-NetKeeper-MyGo/internal/portal"
+	"github.com/xiaomai1011/GZIST-NetKeeper/internal/keeper"
+	"github.com/xiaomai1011/GZIST-NetKeeper/internal/portal"
 )
 
 type recorder struct {

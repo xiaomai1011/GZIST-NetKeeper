@@ -32,11 +32,11 @@
   并按无明确版权声明的公共流传脚本对待
 
 **完整血缘链**：
-gzist_tool（gzist_CAN，已失效）→ YT-O5（GZIST_CampusNet_AutoLogin，MIT）→ GZIST-NetKeeper（xiaomai1011，MIT）→ 本项目（MyGo 重写）
+gzist_tool（gzist_CAN，已失效）→ YT-O5（GZIST_CampusNet_AutoLogin，MIT）→ GZIST-NetKeeper v1（xiaomai1011，PowerShell 版，MIT）→ GZIST-NetKeeper v2（zzstar101，MyGo 重写，MIT）
 
-## 3.1 本项目（MyGo 重写）
+## 3.1 v2（MyGo 重写）
 
-- 项目：[zzstar101/GZIST-NetKeeper-MyGo](https://github.com/zzstar101/GZIST-NetKeeper-MyGo)
+- 项目：本仓库 [xiaomai1011/GZIST-NetKeeper](https://github.com/xiaomai1011/GZIST-NetKeeper) 的 v2.x（开发于 [zzstar101/GZIST-NetKeeper-MyGo](https://github.com/zzstar101/GZIST-NetKeeper-MyGo)，经 PR #2 合并）
 - 许可证：MIT License
 - 版权：Copyright (c) 2026 zzstar101
 - 与上游的关系：以 GZIST-NetKeeper v1（PowerShell 版，仓库标签 `v1-powershell-final`）的登录协议为依据，

@@ -6,10 +6,10 @@
 
 **广州理工学院校园网 · 自动登录 & 掉线保活客户端**
 
-[![Release](https://img.shields.io/github/v/release/zzstar101/GZIST-NetKeeper-MyGo?color=3388BB&label=%E6%9C%80%E6%96%B0%E7%89%88)](https://github.com/zzstar101/GZIST-NetKeeper-MyGo/releases/latest)
-[![Downloads](https://img.shields.io/github/downloads/zzstar101/GZIST-NetKeeper-MyGo/total?color=77BBDD&label=%E4%B8%8B%E8%BD%BD)](https://github.com/zzstar101/GZIST-NetKeeper-MyGo/releases)
-[![Build](https://img.shields.io/github/actions/workflow/status/zzstar101/GZIST-NetKeeper-MyGo/release.yml?label=%E6%9E%84%E5%BB%BA)](https://github.com/zzstar101/GZIST-NetKeeper-MyGo/actions/workflows/release.yml)
-[![License](https://img.shields.io/github/license/zzstar101/GZIST-NetKeeper-MyGo?color=7777AA)](LICENSE)
+[![Release](https://img.shields.io/github/v/release/xiaomai1011/GZIST-NetKeeper?color=3388BB&label=%E6%9C%80%E6%96%B0%E7%89%88)](https://github.com/xiaomai1011/GZIST-NetKeeper/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/xiaomai1011/GZIST-NetKeeper/total?color=77BBDD&label=%E4%B8%8B%E8%BD%BD)](https://github.com/xiaomai1011/GZIST-NetKeeper/releases)
+[![Build](https://img.shields.io/github/actions/workflow/status/xiaomai1011/GZIST-NetKeeper/release.yml?label=%E6%9E%84%E5%BB%BA)](https://github.com/xiaomai1011/GZIST-NetKeeper/actions/workflows/release.yml)
+[![License](https://img.shields.io/github/license/xiaomai1011/GZIST-NetKeeper?color=7777AA)](LICENSE)
 <br>
 ![macOS](https://img.shields.io/badge/macOS-arm64%20%7C%20x64-000?logo=apple&logoColor=white)
 ![Windows](https://img.shields.io/badge/Windows-x64%20%7C%20ARM64-0078D4?logo=windows&logoColor=white)
@@ -17,7 +17,7 @@
 ![Go](https://img.shields.io/badge/Go-1.27-00ADD8?logo=go&logoColor=white)
 [![MyGo](https://img.shields.io/badge/built%20with-MyGo-3388BB)](https://github.com/egoist/mygo)
 
-**[⬇️ 下载](https://github.com/zzstar101/GZIST-NetKeeper-MyGo/releases/latest)** · [安装](#-安装) · [快速上手](#-快速上手) · [日常使用](#-日常使用) · [常见问题](#-常见问题)
+**[⬇️ 下载](https://github.com/xiaomai1011/GZIST-NetKeeper/releases/latest)** · [安装](#-安装) · [快速上手](#-快速上手) · [日常使用](#-日常使用) · [常见问题](#-常见问题)
 
 </div>
 
@@ -35,14 +35,14 @@
 
 ## 📦 安装
 
-到 **[Releases 页面](https://github.com/zzstar101/GZIST-NetKeeper-MyGo/releases/latest)** 下载对应系统的文件。文件名里的 `x64` / `amd64` 是常见的 Intel、AMD 电脑，`arm64` 是 Apple M 系列芯片和 ARM 电脑：
+到 **[Releases 页面](https://github.com/xiaomai1011/GZIST-NetKeeper/releases/latest)** 下载对应系统的文件。文件名里的 `x64` / `amd64` 是常见的 Intel、AMD 电脑，`arm64` 是 Apple M 系列芯片和 ARM 电脑：
 
 | 系统 | 选哪个文件 | 怎么装 |
 |---|---|---|
 | **Windows 10 / 11** | `GZIST-NetKeeper-x.y.z-windows-x64-setup.exe`（骁龙等 ARM 电脑选 `arm64`） | 双击安装，**不需要管理员权限** |
 | **macOS** | `GZIST-NetKeeper-x.y.z-macos-arm64.dmg`（M 系列芯片）/ `-macos-x64.dmg`（Intel） | 打开 dmg，把 App 拖进「应用程序」 |
 | **Linux（Debian / Ubuntu）** | `gzist-netkeeper_x.y.z_amd64.deb`（ARM 选 `arm64`） | `sudo apt install ./gzist-netkeeper_*.deb` |
-| **Linux（其他发行版）** | 无需下载，一行命令安装（会自动更新） | `curl -fsSL https://github.com/zzstar101/GZIST-NetKeeper-MyGo/releases/latest/download/install.sh \| sh` |
+| **Linux（其他发行版）** | 无需下载，一行命令安装（会自动更新） | `curl -fsSL https://github.com/xiaomai1011/GZIST-NetKeeper/releases/latest/download/install.sh \| sh` |
 
 ### 第一次打开被系统拦住？
 
@@ -165,7 +165,7 @@ TUN 模式（虚拟网卡）的 VPN 会接管系统路由，网关的认证跳�
 <details>
 <summary><b>学校又升级了认证系统，登录不上</b></summary>
 
-请 [提交 Issue](https://github.com/zzstar101/GZIST-NetKeeper-MyGo/issues)，附上 **诊断** 日志，以及浏览器 F12 → Network 中网页登录请求的完整 URL（记得把密码打码）。
+请 [提交 Issue](https://github.com/xiaomai1011/GZIST-NetKeeper/issues)，附上 **诊断** 日志，以及浏览器 F12 → Network 中网页登录请求的完整 URL（记得把密码打码）。
 </details>
 
 ## 🗑️ 卸载
@@ -182,7 +182,7 @@ TUN 模式（虚拟网卡）的 VPN 会接管系统路由，网关的认证跳�
 2. 删除旧文件夹；
 3. 安装新版，重新填写一次学号和密码。旧的 `campusnet_config.json` 不会被迁移。
 
-旧版代码保留在标签 [`v1-powershell-final`](https://github.com/zzstar101/GZIST-NetKeeper-MyGo/tree/v1-powershell-final)。
+旧版代码保留在标签 [`v1-powershell-final`](https://github.com/xiaomai1011/GZIST-NetKeeper/tree/v1-powershell-final)。
 
 <details>
 <summary><h2>🛠️ 开发者</h2></summary>
@@ -223,7 +223,7 @@ go run ./tools/genicon               # 重新生成 resources/icon.png
 ## 声明与致谢
 
 - 本工具只适配广州理工学院校园网，仅供学习交流和个人使用，请遵守学校的网络使用规定。
-- 登录协议的血缘链：gzist_tool（gzist_CAN，已失效）→ [YT-O5/GZIST_CampusNet_AutoLogin](https://github.com/YT-O5/GZIST_CampusNet_AutoLogin) → [xiaomai1011/GZIST-NetKeeper](https://github.com/xiaomai1011/GZIST-NetKeeper)（适配 2026-09 新接口的 PowerShell 版）→ 本项目。感谢沿途每一位作者，完整的版权与归属声明见 [NOTICE](NOTICE)。
+- 登录协议的血缘链：gzist_tool（gzist_CAN，已失效）→ [YT-O5/GZIST_CampusNet_AutoLogin](https://github.com/YT-O5/GZIST_CampusNet_AutoLogin) → GZIST-NetKeeper v1（xiaomai1011，适配 2026-09 新接口的 PowerShell 版）→ GZIST-NetKeeper v2（zzstar101，MyGo 三端重写）。感谢沿途每一位作者，完整的版权与归属声明见 [NOTICE](NOTICE)。
 
 ## License
 

@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zzstar101/GZIST-NetKeeper-MyGo/internal/portal"
+	"github.com/xiaomai1011/GZIST-NetKeeper/internal/portal"
 )
 
 type fakePortal struct {

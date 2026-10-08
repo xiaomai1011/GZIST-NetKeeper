@@ -7,7 +7,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/zzstar101/GZIST-NetKeeper-MyGo/internal/art"
+	"github.com/xiaomai1011/GZIST-NetKeeper/internal/art"
 )
 
 func main() {

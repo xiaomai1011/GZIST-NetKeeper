@@ -1,4 +1,4 @@
-module github.com/zzstar101/GZIST-NetKeeper-MyGo
+module github.com/xiaomai1011/GZIST-NetKeeper
 
 go 1.27.1
 

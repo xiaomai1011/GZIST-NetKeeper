@@ -1,146 +1,229 @@
-# GZIST-NetKeeper · 校园网自动登录保活工具
+<div align="center">
 
-广州理工学院校园网（城市热点 Dr.COM / eportal，门户 `10.0.10.252`）自动登录与保活工具。
-适配 **2026 年 9 月学校认证系统升级后的新接口** —— 老脚本集体失效之后，这是目前实测可用的版本。
+<img src="resources/icon.png" width="128" alt="GZIST NetKeeper">
 
-**已实测**：主动注销下线后约 **15~25 秒** 自动重连恢复；重启 / 休眠唤醒 / 拔插网线后通常 **半分钟内** 自动恢复。全程无需人工干预。
+# GZIST NetKeeper
 
-**[⬇️ 下载最新版 ZIP](../../releases/latest)** &nbsp;·&nbsp; [📖 图文使用说明（在线）](https://xiaomai1011.github.io/GZIST-NetKeeper/) &nbsp;·&nbsp; [常见问题](#常见问题) &nbsp;·&nbsp; [工作原理](#工作原理简要)
+**广州理工学院校园网 · 自动登录 & 掉线保活客户端**
 
-![实测日志](docs/demo.svg)
+[![Release](https://img.shields.io/github/v/release/zzstar101/GZIST-NetKeeper-MyGo?color=3388BB&label=%E6%9C%80%E6%96%B0%E7%89%88)](https://github.com/zzstar101/GZIST-NetKeeper-MyGo/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/zzstar101/GZIST-NetKeeper-MyGo/total?color=77BBDD&label=%E4%B8%8B%E8%BD%BD)](https://github.com/zzstar101/GZIST-NetKeeper-MyGo/releases)
+[![Build](https://img.shields.io/github/actions/workflow/status/zzstar101/GZIST-NetKeeper-MyGo/release.yml?label=%E6%9E%84%E5%BB%BA)](https://github.com/zzstar101/GZIST-NetKeeper-MyGo/actions/workflows/release.yml)
+[![License](https://img.shields.io/github/license/zzstar101/GZIST-NetKeeper-MyGo?color=7777AA)](LICENSE)
+<br>
+![macOS](https://img.shields.io/badge/macOS-arm64%20%7C%20x64-000?logo=apple&logoColor=white)
+![Windows](https://img.shields.io/badge/Windows-x64%20%7C%20ARM64-0078D4?logo=windows&logoColor=white)
+![Linux](https://img.shields.io/badge/Linux-x64%20%7C%20arm64-FCC624?logo=linux&logoColor=black)
+![Go](https://img.shields.io/badge/Go-1.27-00ADD8?logo=go&logoColor=white)
+[![MyGo](https://img.shields.io/badge/built%20with-MyGo-3388BB)](https://github.com/egoist/mygo)
+
+**[⬇️ 下载](https://github.com/zzstar101/GZIST-NetKeeper-MyGo/releases/latest)** · [安装](#-安装) · [快速上手](#-快速上手) · [日常使用](#-日常使用) · [常见问题](#-常见问题)
+
+</div>
 
 ---
 
-## 🚀 三步上手（新用户从这里开始）
+填一次学号和密码，之后它就待在托盘（macOS 是菜单栏）里，**每 10 秒检查一次网络，掉线就自动重新认证**。
+重启电脑、休眠唤醒、拔插网线、被服务器踢下线，通常半分钟内就能恢复，不用再打开浏览器手动登录。
 
-1. **下载 ZIP，解压到一个固定文件夹**（例如 `D:\GZIST-NetKeeper\`）—— 之后就一直用这个文件夹
-2. **双击 `重新配置账号.bat`**，输入学号和校园网密码（只填这一次，保存在本机）
-3. **双击 `安装开机自启.bat`** —— 它同时装好开机自启与后台保活，之后的掉线都会自动重连
+<p align="center">
+  <img src="docs/screenshots/main.png" width="380" alt="主窗口">
+  &nbsp;&nbsp;
+  <img src="docs/screenshots/tray.png" width="300" alt="托盘菜单">
+</p>
+<p align="center"><sub>左：主窗口　右：菜单栏 / 托盘菜单（macOS 实机截图，IP 与 MAC 已打码）</sub></p>
 
-> ⚠️ **以后所有操作都用这同一个文件夹。** 脚本按"自己所在的目录"找配置，换个文件夹双击就会报"未找到配置文件"。同理，**别把解压出来的文件夹改名或移动**（开机自启里记着它的路径）。
->
-> 想确认保活是不是真的在跑：双击 `诊断检测.bat`，看**第 5 项**是否显示「运行中」。
-> 想直观验证重连：双击 `注销测试.bat` 把自己踢下线，等十几秒看是否自动恢复。
+## 📦 安装
 
----
+到 **[Releases 页面](https://github.com/zzstar101/GZIST-NetKeeper-MyGo/releases/latest)** 下载对应系统的文件。文件名里的 `x64` / `amd64` 是常见的 Intel、AMD 电脑，`arm64` 是 Apple M 系列芯片和 ARM 电脑：
 
-## 它解决什么问题
+| 系统 | 选哪个文件 | 怎么装 |
+|---|---|---|
+| **Windows 10 / 11** | `GZIST-NetKeeper-x.y.z-windows-x64-setup.exe`（骁龙等 ARM 电脑选 `arm64`） | 双击安装，**不需要管理员权限** |
+| **macOS** | `GZIST-NetKeeper-x.y.z-macos-arm64.dmg`（M 系列芯片）/ `-macos-x64.dmg`（Intel） | 打开 dmg，把 App 拖进「应用程序」 |
+| **Linux（Debian / Ubuntu）** | `gzist-netkeeper_x.y.z_amd64.deb`（ARM 选 `arm64`） | `sudo apt install ./gzist-netkeeper_*.deb` |
+| **Linux（其他发行版）** | 无需下载，一行命令安装（会自动更新） | `curl -fsSL https://github.com/zzstar101/GZIST-NetKeeper-MyGo/releases/latest/download/install.sh \| sh` |
 
-校园网是门户认证（Web Portal）模式，每次**重启电脑、休眠唤醒、拔插网线、IP 变化**之后都要重新打开浏览器登录一遍；挂着不动也会被服务器踢下线。
+### 第一次打开被系统拦住？
 
-本工具常驻后台，每 10 秒静默探测一次网络，一旦发现掉线就自动重新认证，你只需要配置一次。
+安装包没有购买商业代码签名证书，第一次打开时系统会弹出安全提示，按下面操作放行即可，只需要做一次：
 
-## 功能特性
+- **Windows**：出现「Windows 已保护你的电脑」时，点 **更多信息 → 仍要运行**。
+- **macOS**：提示「无法打开」时，打开 **系统设置 → 隐私与安全性**，在页面底部点 **仍要打开**。
+  如果仍然打不开，可以在终端执行：
+  ```sh
+  xattr -dr com.apple.quarantine "/Applications/GZIST NetKeeper.app"
+  ```
+- **Linux**：托盘图标需要 `libayatana-appindicator3`。deb 包会自动安装它；用 install.sh 安装时需要手动装：
+  ```sh
+  sudo apt install libayatana-appindicator3-1        # Debian / Ubuntu
+  sudo dnf install libayatana-appindicator-gtk3      # Fedora
+  ```
+  缺少这个库也能用，只是没有托盘图标。这时程序会直接显示主窗口，关掉窗口后仍在后台保活，再次打开程序就能找回窗口。
 
-- **自动登录**：向 eportal 新版接口（`ACSetting&a=Login`）发送认证请求，紧跟网关 302 跳转携带权威参数，旧接口（`Portal&a=login`）自动兜底
-- **掉线保活**：每 10 秒探测一次网络（仅一个小 HTTPS 请求），检测到掉线才发登录请求，对学校和本机几乎零负担
-- **可靠的在线判断**：用 HTTPS 证书校验检测联网状态 —— 校园网未认证时网关会劫持 HTTP 请求返回假页面，旧脚本的 HTTP 探测会误判在线，本工具不会
-- **开机自启**：Windows 计划任务（登录时触发、零延迟）+ VBS 静默启动器，登录后无窗口后台运行（无需管理员权限）
-- **单实例保护**：重复双击启动不会产生多个守护进程
-- **零依赖**：纯 PowerShell + Windows 自带组件，Win10/11 开箱即用
+## 🚀 快速上手
 
-## 环境要求
+1. **打开 GZIST NetKeeper**，第一次运行会自动弹出主窗口。
+2. 在 **账号** 卡片里填写 **学号** 和 **校园网密码**，点 **保存**。程序会马上登录，状态卡变成「在线」就说明成功了。
+3. 在 **设置** 卡片里打开 **开机自启**。以后开机后它会在后台静默运行，不弹窗口。
 
-| 项目 | 要求 |
+完成后就可以把窗口关掉了。**关闭窗口不会退出程序**，它会继续在托盘里工作。
+
+> 💡 想确认自动重连是否有效：点 **注销** 把自己踢下线，再点 **立即登录**，或者打开自动保活等十几秒，看状态是否恢复为「在线」。
+
+## 🌟 日常使用
+
+### 看托盘图标就够了
+
+| 图标 | 含义 |
 |---|---|
-| 系统 | Windows 10 / 11 |
-| 运行时 | PowerShell 5.1（系统自带，无需安装） |
-| 权限 | 普通用户即可，**无需管理员** |
-| 网络 | 接入广州理工学院校园网（有线 / 无线均可） |
+| ★ 实心星 | 在线 |
+| ☆ 空心星 | 离线（开着自动保活时会自动重连） |
+| 星里有圆点 | 正在登录 |
+| 星里有「!」 | 需要你处理，打开主窗口查看原因 |
 
-## 文件说明
+> Windows / Linux 上的托盘图标是彩色的。macOS 菜单栏图标会自动跟随系统的深色 / 浅色外观。
 
-| 文件 | 作用 |
+### 托盘菜单
+
+点击托盘图标（Windows 上左键单击会直接打开主窗口，右键弹出菜单）：
+
+- **状态**：当前是否在线，以及本机 IP
+- **立即登录 / 注销**：手动登录或下线
+- **打开主窗口**
+- **开机自启**：打勾表示开启
+- **重启以更新**：有新版本下载好时才会出现
+- **退出**：彻底退出程序，退出后就不再保活
+
+### 主窗口
+
+| 区域 | 作用 |
 |---|---|
-| `campus_net.ps1` | **核心脚本**：登录 / 在线检测 / 保活守护 |
-| `重新配置账号.bat` | 配置或修改学号、密码 |
-| `校园网登录.bat` | 手动登录一次（测试用） |
-| `诊断检测.bat` | 一键检查：在线状态、配置、**保活是否在运行**、**开机自启指向**（**出问题先跑这个**） |
-| `注销测试.bat` | 主动注销下线，验证自动重连效果 |
-| `安装开机自启.bat` | 注册开机自启并立即启动保活守护（推荐） |
-| `启动后台保活.bat` | 不装自启，临时启动一次守护 |
-| `卸载开机自启.bat` | 移除开机自启并结束守护进程 |
-| `silent_start.vbs` | 静默启动器（被 bat 调用，避免弹出窗口） |
-| `install_autostart.ps1` | 自启安装逻辑（被 `安装开机自启.bat` 调用） |
-| `logout.ps1` | 注销逻辑（被 `注销测试.bat` 调用） |
-| `index.html` | 图文详细教程 + 常见问题（也是 [GitHub Pages 首页](https://xiaomai1011.github.io/GZIST-NetKeeper/)，离线时可直接双击打开） |
+| **状态卡** | 在线状态、本机 IP / MAC、上次登录时间；还有 **立即登录**、**注销**、**诊断** 三个按钮 |
+| **账号** | 修改学号或密码。密码框留空表示不修改已保存的密码 |
+| **设置 · 自动保活** | 每 10 秒检测一次，掉线自动重登。关闭后只在你手动点登录时才登录 |
+| **设置 · 开机自启** | 登录系统后自动在后台运行 |
+| **日志** | 最近 200 条记录。点 **日志文件** 可以打开完整日志 |
 
-> 倒数三个是内部脚本，由 bat 自动调用，不需要手动运行。
+### 自动保活是怎么工作的
 
-## 工作原理（简要）
+- 检测到掉线后会立即登录。如果登录失败，会依次等待 **10 秒 → 30 秒 → 1 分钟 → 2 分钟** 后再重试，不会一直刷服务器。
+- 电脑从休眠中唤醒后会马上检测一次，不用等下一个 10 秒。
+- 你手动点了 **注销** 之后，自动保活会暂停，直到你再次点 **立即登录**，免得刚注销就被自动登录回去。
+- 如果服务器明确拒绝登录（`ret_code=2` 或 `8`，原因见下方常见问题），重试也解决不了，所以程序会 **暂停自动重试** 并弹出通知。状态卡里会给出处理建议，处理完后点 **立即登录**。
 
-1. 掉线时访问任意 HTTP 网站会被网关 302 劫持到认证页，URL 中带有网关登记的 `wlanuserip / wlanusermac / wlanacip`
-2. 脚本捕获该跳转，**立刻**携带这些参数向 `/eportal/?c=ACSetting&a=Login` 发起认证（顺序很关键，网关需要先为该 IP 建立会话）
-3. 登录后用 HTTPS 探测验证是否真正恢复
+### 自动更新
+
+程序会在联网后检查新版本，之后每 6 小时检查一次。新版本会在后台下载好，然后在托盘菜单和主窗口中提示 **重启以更新**，点一下就会完成更新。
+通过 deb 安装的版本只会提醒，请用 `apt` 或重新下载 deb 来升级。
+
+## ❓ 常见问题
 
 <details>
-<summary><b>点击查看真实测试日志（2026-09-18 新认证系统验收）</b></summary>
+<summary><b>提示 ret_code=8，自动重试被暂停了</b></summary>
 
-```
-[07:56:15] ========== 9-18 新版脚本(ACSetting+网关参数)验收测试 ==========
-[07:56:15] 初始在线状态: True
-[07:56:15] 步骤A: 新版注销接口下线 (ACSetting&a=Logout)
-[07:56:15]   注销响应: <html>... <body> Logout succeed. </body> </html>
-[07:56:24] 步骤B: 注销后离线验证 = True (期望 True)
-[07:56:24] 步骤C: 运行新版 campus_net.ps1 自动登录...
-[07:56:47]   脚本耗时: 23 秒
-[07:56:50] 步骤D: 最终在线验证 = True (期望 True)
-[07:56:50] >>> 测试 PASS: 新认证系统适配成功!
-[07:56:50] ========== 测试结束 ==========
+通常是 **密码错误**，或者网关登记的 IP / MAC 和本机对不上。按顺序试试：
 
-[22:08:48] ==== 第三轮: 守护自愈测试(由守护自己完成重连) ====
-[22:08:50] 注销响应: {"result":"1","msg":"注销成功"}
-[22:08:55] 注销后在线: False (期望 False)
-[22:09:45] 守护已自动重连! 恢复时间: 22:09:45 ==> 测试 PASS
-[22:09:45] ==== 测试结束 ====
-```
-
-（原日志中的学号、IP、MAC 已打码处理）
+1. 确认学号和密码正确（可以在 **账号** 里重新填写并保存）；
+2. 用手机连接校园网，浏览器打开 `10.0.10.252`，把这台电脑注销；
+3. 电脑断开 Wi-Fi 后重新连接（或者拔插网线），让它重新获取 IP；
+4. 回到程序点 **立即登录**。
 </details>
 
-## 常见问题
+<details>
+<summary><b>提示 ret_code=2</b></summary>
 
-- **提示"登录失败 ret_code=8"**
-  多为密码错误，或该账号正在别处在线。先用手机浏览器打开 `10.0.10.252` 注销本机，再重试。
-- **改了校园网密码**
-  重新运行 `重新配置账号.bat`。
-- **开着 VPN 时检测不准 / 掉线后不自动重连**
-  VPN 尤其 **TUN 模式（虚拟网卡）** 会接管系统路由，把发往校园网关的请求也一并吞进隧道。后果是：掉线时网关那个 302 跳转捕获不到 —— 而登录必需的 `wlanuserip / wlanusermac / wlanacip` 参数就在跳转里，登录因此无法完成；同时在线 / 离线判断也会失真（可能显示在线其实已掉线）。**测试和日常使用请先关闭 VPN**，只保留校园网本身的连接。
-- **任务栏出现 PowerShell 窗口**
-  运行一次 `安装开机自启.bat`（会切换为 VBS 静默启动，之后无窗口）。
-- **不确定守护有没有在跑**
-  运行 `诊断检测.bat`，看**第 5 项**：显示「运行中」就是真的在跑（用命名互斥锁判断，比看进程列表准）。没在跑就双击 `启动后台保活.bat`；**第 6 项**会告诉你开机自启指向的是哪个目录。
-- **想换检测间隔**
-  编辑 `campus_net.ps1` 中的 `$CheckInterval`（单位：秒，默认 `10`）。不建议设得过短。
-- **想彻底卸载**
-  先运行 `卸载开机自启.bat`，再删掉整个文件夹即可（配置和日志都在一起，不会残留到系统别处）。
-- **学校又升级了认证系统，脚本失效怎么办**
-  9-18 升级后旧接口全部返回 500，需要抓取新的登录页地址重新适配。提交 Issue，附上浏览器 F12 → Network 里新登录请求的完整 URL。
+这个账号已经在其他设备上登录了。先在那台设备上注销，或者按上一条的方法用手机打开 `10.0.10.252` 注销，然后点 **立即登录**。
+</details>
 
-## 声明
+<details>
+<summary><b>开着 VPN / 代理时检测不准，掉线后不重连</b></summary>
 
-- 本工具仅适配广州理工学院校园网环境，仅供学习交流与个人便利使用，请遵守学校网络使用规定
-- 密码仅以 Base64 编码保存在本机 `campusnet_config.json`（编码混淆，**非加密**），请勿将该文件或含配置的目录分享给他人
-- 请勿将检测间隔设置得过短给学校服务器造成压力
+TUN 模式（虚拟网卡）的 VPN 会接管系统路由，网关的认证跳转和在线检测都会失真。使用校园网认证时请先关闭 VPN，或者把 `10.0.10.252` 和校园网网段设置为直连。
+</details>
 
-## 致谢
+<details>
+<summary><b>不知道哪里出了问题</b></summary>
 
-本项目的登录脚本有一段可以追溯的血缘链，向沿途的每一位作者致谢：
+点状态卡里的 **诊断**。它会依次检查 **网卡 → 网关跳转 → 认证服务器 → 外网**，每一步的结果都写在日志里。提 Issue 时请附上这段日志（日志中的密码已自动隐藏为 `***`）。
+</details>
 
-1. **gzist_tool**（[gzist-tool/gzist_CAN](https://github.com/gzist-tool/gzist_CAN)，已失效）
-   —— 目前可考的**最早作者**，写了最初的简版自动登录脚本（据上游作者称不到百行）。
-   该账号现已删除、仓库 404，具体身份不详
-2. **[YT-O5/GZIST_CampusNet_AutoLogin](https://github.com/YT-O5/GZIST_CampusNet_AutoLogin)**
-   —— 在 gzist_tool 的脚本基础上改进完善。MIT License，版权归 **ytt_pineapple** 所有
-   （`Copyright (c) 2025 ytt_pineapple`）。它使用的仍是 2026-09 学校认证系统升级**之前**的旧接口
-   （`Portal&a=login`），在现行系统下已无法完成登录
-3. **本项目 GZIST-NetKeeper** —— 在上游基础上重写，适配新版 `ePortal`（`ACSetting&a=Login`）接口，
-   并增加了后台保活与诊断功能
+<details>
+<summary><b>改了校园网密码</b></summary>
 
-> 上游作者 YT-O5 本人也于 2026-09 来本项目提了 [Issue #1](https://github.com/xiaomai1011/GZIST-NetKeeper/issues/1)
-> 确认了这段血缘关系，并表示会尽快把最早的那份百行源码重新打包上传。感谢这位较真的原作者！
+在 **账号** 卡片里填写新密码，点 **保存**，程序会用新密码重新登录。
+</details>
 
-完整的版权与归属声明见 [NOTICE](NOTICE)。
+<details>
+<summary><b>密码存在哪里，安全吗？</b></summary>
+
+密码保存在系统自带的凭据库里：macOS 是 **钥匙串**，Windows 是 **凭据管理器**，Linux 是 **Secret Service**（GNOME Keyring、KWallet 等）。
+如果系统里没有可用的凭据库（常见于没有桌面环境的 Linux），会退回到数据目录下的一个仅本人可读（`0600`）的文件，界面上会提示这一点。
+程序只会与学校的认证服务器通信，检查更新时会访问 GitHub，不会上传任何数据。
+</details>
+
+<details>
+<summary><b>学校又升级了认证系统，登录不上</b></summary>
+
+请 [提交 Issue](https://github.com/zzstar101/GZIST-NetKeeper-MyGo/issues)，附上 **诊断** 日志，以及浏览器 F12 → Network 中网页登录请求的完整 URL（记得把密码打码）。
+</details>
+
+## 🗑️ 卸载
+
+先在 **设置** 里关闭 **开机自启**，再点托盘菜单的 **退出**，然后：
+
+- **Windows**：设置 → 应用 → 找到 GZIST NetKeeper → 卸载
+- **macOS**：把「应用程序」里的 GZIST NetKeeper 拖进废纸篓
+- **Linux**：`sudo apt remove gzist-netkeeper`，或 `sh install.sh --uninstall`
+
+## ⬆️ 从旧版（PowerShell 脚本版）升级
+
+1. 在旧版文件夹里双击 **`卸载开机自启.bat`**，停掉旧的守护进程和计划任务；
+2. 删除旧文件夹；
+3. 安装新版，重新填写一次学号和密码。旧的 `campusnet_config.json` 不会被迁移。
+
+旧版代码保留在标签 [`v1-powershell-final`](https://github.com/zzstar101/GZIST-NetKeeper-MyGo/tree/v1-powershell-final)。
+
+<details>
+<summary><h2>🛠️ 开发者</h2></summary>
+
+使用 Go 1.27 以上和 [MyGo](https://github.com/egoist/mygo) 原生 UI 编写，不依赖 cgo、webview 或 Node。
+
+```sh
+go tool mygo dev                     # 开发模式：改代码后自动重启
+CGO_ENABLED=0 go test ./...          # 单元测试（含假门户服务器与界面测试）
+go tool mygo vet .                   # MyGo 静态检查
+go tool mygo build                   # 打包当前平台
+go tool mygo build -platform windows/amd64,linux/amd64   # 交叉打包
+go run ./tools/genicon               # 重新生成 resources/icon.png
+```
+
+| 路径 | 内容 |
+|---|---|
+| `main.go` | 应用装配：托盘、窗口、开机自启、休眠唤醒、自动更新 |
+| `view.go` | 主窗口界面 |
+| `internal/portal` | ePortal 协议：在线检测、302 参数捕获、登录、注销、诊断 |
+| `internal/keeper` | 保活状态机：探测、退避、暂停 |
+| `internal/store` | 设置与系统凭据库 |
+| `internal/applog` | 内存日志与轮转日志文件 |
+| `internal/art` | 程序绘制的图标 |
+
+**登录流程**：未认证时，访问 HTTP 网站会被网关 302 跳转到认证页，跳转地址里带有 `wlanuserip / wlanusermac / wlanacip`。程序捕获这次跳转后，立刻带着这些参数请求 `/eportal/?c=ACSetting&a=Login`。它会依次尝试「学号带或不带 `,0,` 前缀 × 两个 AC 地址 × 两种 MAC 写法」的组合，全部失败后再用旧接口 `Portal&a=login` 兜底。在线判断依靠 `www.baidu.com` 和 `www.qq.com` 的 HTTPS 证书校验，网关劫持返回的假页面无法通过这一校验。
+
+**发布**：所有安装包都由 GitHub Actions 构建，不从本机上传。流程如下：
+
+1. 修改 `mygo.json` 中的 `version`，提交后打标签并推送，例如 `git tag v2.0.1 && git push origin main v2.0.1`；
+2. [release.yml](.github/workflows/release.yml) 会先检查标签和 `version` 是否一致并跑测试，然后构建 6 个目标、签名，给安装包加上架构后缀，再上传到同名的 Release 草稿；
+3. 构建全部成功后，CI 会自动发布这个 Release。已安装的客户端从 `releases/latest` 读取更新清单，完成自动更新。
+
+更新签名使用 `mygo.json` 里 `updates.publicKey` 对应的私钥，私钥保存在仓库 Secret `MYGO_UPDATER_PRIVATE_KEY` 中。**私钥丢失后，已安装的客户端将无法再自动更新**，请妥善备份。
+
+</details>
+
+## 声明与致谢
+
+- 本工具只适配广州理工学院校园网，仅供学习交流和个人使用，请遵守学校的网络使用规定。
+- 登录协议的血缘链：gzist_tool（gzist_CAN，已失效）→ [YT-O5/GZIST_CampusNet_AutoLogin](https://github.com/YT-O5/GZIST_CampusNet_AutoLogin) → [xiaomai1011/GZIST-NetKeeper](https://github.com/xiaomai1011/GZIST-NetKeeper)（适配 2026-09 新接口的 PowerShell 版）→ 本项目。感谢沿途每一位作者，完整的版权与归属声明见 [NOTICE](NOTICE)。
 
 ## License
 

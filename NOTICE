@@ -32,7 +32,17 @@
   并按无明确版权声明的公共流传脚本对待
 
 **完整血缘链**：
-gzist_tool（gzist_CAN，已失效）→ YT-O5（GZIST_CampusNet_AutoLogin，MIT）→ 本项目（GZIST-NetKeeper，MIT）
+gzist_tool（gzist_CAN，已失效）→ YT-O5（GZIST_CampusNet_AutoLogin，MIT）→ GZIST-NetKeeper（xiaomai1011，MIT）→ 本项目（MyGo 重写）
+
+## 3.1 本项目（MyGo 重写）
+
+- 项目：[zzstar101/GZIST-NetKeeper-MyGo](https://github.com/zzstar101/GZIST-NetKeeper-MyGo)
+- 许可证：MIT License
+- 版权：Copyright (c) 2026 zzstar101
+- 与上游的关系：以 GZIST-NetKeeper v1（PowerShell 版，仓库标签 `v1-powershell-final`）的登录协议为依据，
+  用 Go 与 [MyGo](https://github.com/egoist/mygo) 框架完全重写为 macOS / Windows / Linux 三端托盘客户端
+- 界面配色与文案致敬动画《BanG Dream! It's MyGO!!!!!》，属于非官方的同人致敬；
+  作品名称及相关权利归 Bushiroad 等权利方所有。本项目不包含任何官方图片、音乐或歌词，图标均为程序绘制
 
 ## 4. 使用条款
 

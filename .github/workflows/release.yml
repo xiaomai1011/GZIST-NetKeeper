@@ -1,0 +1,110 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  draft-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Check tag matches mygo.json version
+        run: |
+          want="v$(jq -r .version mygo.json)"
+          if [ "$GITHUB_REF_NAME" != "$want" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match mygo.json version $want"
+            exit 1
+          fi
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - name: Test
+        run: go test ./...
+        env:
+          CGO_ENABLED: "0"
+      - name: Create draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft --verify-tag \
+              --title "GZIST NetKeeper $GITHUB_REF_NAME" --generate-notes
+          fi
+
+  build:
+    needs: draft-release
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS
+            os: macos-latest
+            platform: darwin/arm64,darwin/amd64
+          - name: Windows
+            os: ubuntu-latest
+            platform: windows/amd64,windows/arm64
+          - name: Linux
+            os: ubuntu-latest
+            platform: linux/amd64,linux/arm64
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - name: Install NSIS
+        if: matrix.name == 'Windows'
+        run: sudo apt-get update && sudo apt-get install -y nsis
+      - name: Build
+        run: go tool mygo build -platform "${{ matrix.platform }}"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MYGO_UPDATER_PRIVATE_KEY: ${{ secrets.MYGO_UPDATER_PRIVATE_KEY }}
+      # mygo build names the installers of every architecture the same
+      # ("GZIST NetKeeper 2.0.0.dmg", "GZIST NetKeeper Setup 2.0.0.exe"), so
+      # -upload would overwrite one with the other. Give them arch-specific
+      # names and upload like -upload does: files first, manifests last.
+      - name: Rename installers and upload
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          version="$(jq -r .version mygo.json)"
+          files=(); manifests=()
+          for dir in build/*/; do
+            target="$(basename "$dir")"            # e.g. darwin-arm64
+            os="${target%-*}"; arch="${target#*-}"
+            [ "$arch" = amd64 ] && arch=x64
+            for f in "$dir"*.dmg; do
+              n="${dir}GZIST-NetKeeper-${version}-macos-${arch}.dmg"; mv "$f" "$n"; files+=("$n")
+            done
+            for f in "$dir"*" Setup "*.exe; do
+              n="${dir}GZIST-NetKeeper-${version}-windows-${arch}-setup.exe"; mv "$f" "$n"; files+=("$n")
+            done
+            for f in "$dir"*.deb "$dir"*.tar.gz "$dir"*.delta; do files+=("$f"); done
+            if [ -f "${dir}install.sh" ] && [[ " ${files[*]} " != *"install.sh"* ]]; then files+=("${dir}install.sh"); fi
+            for f in "$dir"update-*.json; do manifests+=("$f"); done
+          done
+          printf 'file: %s\n' "${files[@]}" "${manifests[@]}"
+          gh release upload "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --clobber "${files[@]}"
+          gh release upload "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --clobber "${manifests[@]}"
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft=false --latest

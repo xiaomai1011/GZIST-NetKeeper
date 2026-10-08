@@ -1,0 +1,18 @@
+{
+  "name": "GZIST NetKeeper",
+  "identifier": "io.github.zzstar101.gzist-netkeeper",
+  "version": "2.0.0",
+  "copyright": "Copyright © 2026 zzstar101. MIT License.",
+  "out": "build",
+  "updates": {
+    "publicKey": "bX0o26sICXPZNejUCcYNBp0vBDx0fkuWblUPOuOrTs0=",
+    "github": "zzstar101/GZIST-NetKeeper-MyGo"
+  },
+  "linux": {
+    "maintainer": "zzstar101 <zzstar101@users.noreply.github.com>",
+    "comment": "广州理工学院校园网自动登录与保活",
+    "categories": ["Network"],
+    "depends": ["libayatana-appindicator3-1"],
+    "command": "gzist-netkeeper"
+  }
+}

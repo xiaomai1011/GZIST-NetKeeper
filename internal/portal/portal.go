@@ -17,6 +17,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -42,6 +43,13 @@ var ErrNoNIC = errors.New("未检测到已连接的网卡")
 // level.
 var ErrNoResponse = errors.New("认证服务器无响应")
 
+// ErrCampusUnavailable is returned when the portal does not accept a TCP
+// connection, usually because the machine is not on the campus network.
+var ErrCampusUnavailable = errors.New("认证服务器不可达（是否已连接校园网？）")
+
+// PreflightTimeout bounds the TCP check done before logging in.
+const PreflightTimeout = 1500 * time.Millisecond
+
 // NIC is the local interface that routes to the portal.
 type NIC struct {
 	Name string
@@ -56,13 +64,57 @@ type Info struct {
 	ACIP    string
 }
 
+// Outcome classifies what the server said about a login attempt.
+type Outcome int
+
+const (
+	// Unknown: the answer did not say; only a probe can tell.
+	Unknown Outcome = iota
+	// Success: the server authenticated the account.
+	Success
+	// BadCredential: wrong account or password; other parameters will not
+	// help.
+	BadCredential
+	// ParamMismatch: the IP / MAC / AC did not match; another combination
+	// may work.
+	ParamMismatch
+	// InUse: the account is already online, usually on another device.
+	InUse
+)
+
+func (o Outcome) String() string {
+	switch o {
+	case Success:
+		return "认证成功"
+	case BadCredential:
+		return "账号或密码错误"
+	case ParamMismatch:
+		return "参数不匹配"
+	case InUse:
+		return "账号已在线"
+	default:
+		return "未知"
+	}
+}
+
 // Result describes a login attempt the server answered.
 type Result struct {
 	OK            bool
 	AlreadyOnline bool
+	Outcome       Outcome
 	RetCode       int // 0 when unknown
 	Msg           string
 	Warn          string
+}
+
+// Session is the set of parameters a login succeeded with.
+type Session struct {
+	Suffixed  bool   // account sent with Suffix
+	ACIP      string // access controller
+	MACPlain  bool   // MAC sent without separators
+	UserIP    string
+	UserMAC   string // as sent
+	PortalAPI bool   // logged in through the old Portal interface
 }
 
 // Client talks to the portal. The zero value is not usable; call New.
@@ -81,10 +133,15 @@ type Client struct {
 
 	// LocalNIC finds the interface that routes to the portal.
 	LocalNIC func() (NIC, error)
+	// Preflight checks that the portal accepts connections.
+	Preflight func(ctx context.Context) error
 	// Sleep waits between attempts; tests replace it.
 	Sleep func(ctx context.Context, d time.Duration) error
 	// Log receives one line per step. Passwords never reach it.
 	Log func(string)
+
+	mu   sync.Mutex
+	last *Session // the most recent successful login
 }
 
 // New returns a client configured for the campus network.
@@ -106,7 +163,44 @@ func New(log func(string)) *Client {
 		Log:   log,
 	}
 	c.LocalNIC = func() (NIC, error) { return RouteNIC(c.PortalHost) }
+	c.Preflight = c.dialPortal
 	return c
+}
+
+// dialPortal opens and closes a TCP connection to the portal.
+func (c *Client) dialPortal(ctx context.Context) error {
+	u, err := url.Parse(c.PortalBase)
+	if err != nil {
+		return err
+	}
+	host := u.Host
+	if u.Port() == "" {
+		host = net.JoinHostPort(u.Hostname(), "80")
+	}
+	ctx, cancel := context.WithTimeout(ctx, PreflightTimeout)
+	defer cancel()
+	var d net.Dialer
+	conn, err := d.DialContext(ctx, "tcp", host)
+	if err != nil {
+		return err
+	}
+	return conn.Close()
+}
+
+// LastSession returns the parameters of the most recent successful login.
+func (c *Client) LastSession() (Session, bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.last == nil {
+		return Session{}, false
+	}
+	return *c.last, true
+}
+
+func (c *Client) remember(s Session) {
+	c.mu.Lock()
+	c.last = &s
+	c.mu.Unlock()
 }
 
 func sleep(ctx context.Context, d time.Duration) error {
@@ -281,7 +375,38 @@ var (
 	reResult  = regexp.MustCompile(`"result"\s*:\s*"?1"?`)
 	reRetCode = regexp.MustCompile(`"ret_code"\s*:\s*"?(\d+)`)
 	reMsg     = regexp.MustCompile(`"msg"\s*:\s*"([^"]*)"`)
+
+	// What the ACSetting pages say. The success page is titled 认证成功页.
+	reSuccess  = regexp.MustCompile(`(?i)认证成功|登录成功|成功登录|Dr\.COMWebLoginID_3`)
+	reBadCred  = regexp.MustCompile(`(?i)ldap auth error|userid error|passw(or)?d error|密码错误|账号不存在|用户不存在|账号或密码|用户名或密码`)
+	reInUse    = regexp.MustCompile(`(?i)\bin ?use\b|已在线|已经在线|limit users|在线终端|终端数`)
+	reMismatch = regexp.MustCompile(`(?i)\b(ip|mac|ac|acip|nas)\b|不匹配|不一致|mismatch|参数`)
 )
+
+// Classify reads an ACSetting answer. msg is the server's own message
+// (msga), if any.
+func Classify(body string) (o Outcome, msg string) {
+	if m := reMsga.FindStringSubmatch(body); m != nil {
+		msg = strings.TrimSpace(m[1])
+	}
+	switch {
+	case msg == "":
+		// Only the success page is recognizable without a message.
+		if reSuccess.MatchString(body) {
+			return Success, ""
+		}
+		return Unknown, ""
+	case reSuccess.MatchString(msg):
+		return Success, msg
+	case reBadCred.MatchString(msg):
+		return BadCredential, msg
+	case reInUse.MatchString(msg):
+		return InUse, msg
+	case reMismatch.MatchString(msg):
+		return ParamMismatch, msg
+	}
+	return Unknown, msg
+}
 
 func (c *Client) get(ctx context.Context, rawURL string, timeout time.Duration) (string, error) {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
@@ -307,8 +432,48 @@ func clip(s string) string {
 	return s
 }
 
+// combo is one way to fill in the ACSetting form.
+type combo struct {
+	suffixed bool
+	ac, mac  string
+}
+
+func (cb combo) session(ip string) Session {
+	return Session{Suffixed: cb.suffixed, ACIP: cb.ac, MACPlain: NormalizeMAC(cb.mac) == cb.mac, UserIP: ip, UserMAC: cb.mac}
+}
+
+// combos lists the forms to try, the one that worked last time first.
+func (c *Client) combos(p params) []combo {
+	var out []combo
+	for _, suffixed := range []bool{true, false} {
+		for _, ac := range p.acs {
+			for _, mac := range p.macs {
+				out = append(out, combo{suffixed, ac, mac})
+			}
+		}
+	}
+	last, ok := c.LastSession()
+	if !ok || last.PortalAPI {
+		return out
+	}
+	for i, cb := range out {
+		s := cb.session(p.ip)
+		if s.Suffixed == last.Suffixed && s.ACIP == last.ACIP && s.MACPlain == last.MACPlain {
+			copy(out[1:i+1], out[:i])
+			out[0] = cb
+			break
+		}
+	}
+	return out
+}
+
 // Login signs the account in. It returns an error only when no attempt got
 // an answer from the server.
+//
+// Each ACSetting answer is classified: success ends the login even when
+// the internet is not routed yet, a credential error ends it without trying
+// other parameters, a parameter mismatch moves on to the next combination,
+// and anything else is settled by probing the internet.
 func (c *Client) Login(ctx context.Context, account, password string) (Result, error) {
 	if c.Online(ctx) {
 		c.logf("已在线，无需登录")
@@ -320,6 +485,15 @@ func (c *Client) Login(ctx context.Context, account, password string) (Result, e
 		return Result{}, ErrNoNIC
 	}
 	c.logf("网卡 %s  IP %s  MAC %s", nic.Name, nic.IP, nic.MAC)
+	if c.Preflight != nil {
+		if err := c.Preflight(ctx); err != nil {
+			if ctx.Err() != nil {
+				return Result{}, ctx.Err()
+			}
+			c.logf("认证服务器 %s 不可达: %v", c.PortalBase, err)
+			return Result{}, ErrCampusUnavailable
+		}
+	}
 	info, hijacked, err := c.PortalInfo(ctx)
 	switch {
 	case err != nil:
@@ -336,31 +510,48 @@ func (c *Client) Login(ctx context.Context, account, password string) (Result, e
 
 	answered := false
 	// Scheme 1: ACSetting, the interface used since the 2026-09 upgrade.
-	for _, acc := range []string{c.Suffix + account, account} {
-		for _, ac := range p.acs {
-			for _, mac := range p.macs {
-				if err := ctx.Err(); err != nil {
-					return Result{}, err
-				}
-				u := c.acSettingURL(acc, password, p.ip, mac, ac)
-				c.logf("ACSetting 登录: %s", c.acSettingURL(acc, "***", p.ip, mac, ac))
-				body, err := c.get(ctx, u, 10*time.Second)
-				if err != nil {
-					c.logf("  请求失败: %v", err)
-					continue
-				}
-				answered = true
-				if m := reMsga.FindStringSubmatch(body); m != nil && m[1] != "" {
-					c.logf("  服务器提示: %s", m[1])
-				}
-				c.logf("  响应: %s", clip(body))
-				if err := c.Sleep(ctx, 2*time.Second); err != nil {
-					return Result{}, err
-				}
-				if c.Online(ctx) {
-					return c.success(ctx, Result{OK: true}), nil
-				}
-			}
+	for _, cb := range c.combos(p) {
+		if err := ctx.Err(); err != nil {
+			return Result{}, err
+		}
+		acc := account
+		if cb.suffixed {
+			acc = c.Suffix + account
+		}
+		u := c.acSettingURL(acc, password, p.ip, cb.mac, cb.ac)
+		c.logf("ACSetting 登录: %s", c.acSettingURL(acc, "***", p.ip, cb.mac, cb.ac))
+		body, err := c.get(ctx, u, 10*time.Second)
+		if err != nil {
+			c.logf("  请求失败: %v", err)
+			continue
+		}
+		answered = true
+		out, msg := Classify(body)
+		if msg != "" {
+			c.logf("  服务器提示: %s", msg)
+		}
+		c.logf("  响应: %s", clip(body))
+		c.logf("  判定: %s", out)
+		sess := cb.session(p.ip)
+		switch out {
+		case Success:
+			c.remember(sess)
+			return c.success(ctx, Result{OK: true, Outcome: Success, Msg: msg}), nil
+		case BadCredential:
+			return Result{Outcome: BadCredential, Msg: msg}, nil
+		case ParamMismatch:
+			continue
+		}
+		// InUse or Unknown: see whether we got through anyway.
+		if err := c.Sleep(ctx, 2*time.Second); err != nil {
+			return Result{}, err
+		}
+		if c.Online(ctx) {
+			c.remember(sess)
+			return Result{OK: true, Outcome: out, Msg: msg}, nil
+		}
+		if out == InUse {
+			return Result{Outcome: InUse, Msg: msg}, nil
 		}
 	}
 
@@ -386,10 +577,8 @@ func (c *Client) Login(ctx context.Context, account, password string) (Result, e
 				r.Msg = m[1]
 			}
 			if reResult.MatchString(body) {
-				r.OK = true
-				if err := c.Sleep(ctx, 2*time.Second); err != nil {
-					return Result{}, err
-				}
+				r.OK, r.Outcome = true, Success
+				c.remember(Session{Suffixed: true, ACIP: ac, MACPlain: NormalizeMAC(mac) == mac, UserIP: p.ip, UserMAC: mac, PortalAPI: true})
 				return c.success(ctx, r), nil
 			}
 			return r, nil
@@ -401,6 +590,8 @@ func (c *Client) Login(ctx context.Context, account, password string) (Result, e
 	return Result{}, ErrNoResponse
 }
 
+// success waits for the gateway to route us and warns if it does not.
+// The login itself is not repeated.
 func (c *Client) success(ctx context.Context, r Result) Result {
 	if err := c.Sleep(ctx, 3*time.Second); err == nil && !c.Online(ctx) {
 		r.Warn = "认证成功但暂未连通外网，可能需要 1-2 分钟生效"
@@ -422,19 +613,28 @@ func (c *Client) portalLoginURL(account, pwd, ip, mac, ac string) string {
 		"&wlan_ac_ip=" + ac + "&wlan_ac_name=&jsVersion=3.3.2&v=" + strconv.Itoa(rand.IntN(99999))
 }
 
-// Logout signs the current device out.
+// Logout signs the current device out. It uses the parameters of the last
+// successful login when they still match this machine, otherwise the
+// local interface.
 func (c *Client) Logout(ctx context.Context, account string) error {
-	nic, err := c.LocalNIC()
-	if err != nil {
+	nic, nicErr := c.LocalNIC()
+	ip, mac, ac := nic.IP, NormalizeMAC(nic.MAC), ""
+	if len(c.ACIPs) > 0 {
+		ac = c.ACIPs[0]
+	}
+	if s, ok := c.LastSession(); ok && (nicErr != nil || s.UserIP == nic.IP) {
+		ip, mac, ac = s.UserIP, s.UserMAC, s.ACIP
+		c.logf("注销使用上次登录的会话参数")
+	} else if nicErr != nil {
 		return ErrNoNIC
 	}
-	mac := NormalizeMAC(nic.MAC)
-	ac := c.ACIPs[0]
 	urls := []string{
-		c.PortalBase + "?c=ACSetting&a=Logout&ver=1.0&url=drappall&wlan_user_ip=" + nic.IP + "&wlan_user_mac=" + mac,
-		c.PortalBase + "?c=Portal&a=logout&callback=dr1003&login_method=1&user_account=" + escape(c.Suffix+account) +
-			"&wlan_user_ip=" + nic.IP + "&wlan_user_mac=" + mac + "&wlan_user_ipv6=&wlan_ac_ip=" + ac +
-			"&wlan_ac_name=&jsVersion=3.3.2&v=" + strconv.Itoa(rand.IntN(99999)),
+		c.PortalBase + "?c=ACSetting&a=Logout&ver=1.0&url=drappall&wlan_user_ip=" + ip + "&wlan_user_mac=" + mac,
+	}
+	if ac != "" {
+		urls = append(urls, c.PortalBase+"?c=Portal&a=logout&callback=dr1003&login_method=1&user_account="+escape(c.Suffix+account)+
+			"&wlan_user_ip="+ip+"&wlan_user_mac="+mac+"&wlan_user_ipv6=&wlan_ac_ip="+ac+
+			"&wlan_ac_name=&jsVersion=3.3.2&v="+strconv.Itoa(rand.IntN(99999)))
 	}
 	var last error = ErrNoResponse
 	for _, u := range urls {

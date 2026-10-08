@@ -198,3 +198,33 @@ func TestRunProcessesCommands(t *testing.T) {
 		}
 	}
 }
+
+func TestRejectionsPause(t *testing.T) {
+	for _, o := range []portal.Outcome{portal.BadCredential, portal.InUse} {
+		p := &fakePortal{results: []portal.Result{{Outcome: o, Msg: "ldap auth error"}}}
+		k, c, notes := setup(p, "a")
+		k.Tick(ctx)
+		s := k.State()
+		if s.Pause != PausedByServer || s.LastError == "" || len(*notes) != 1 {
+			t.Fatalf("%v: %+v notes=%v", o, s, *notes)
+		}
+		c.advance(time.Hour)
+		k.Tick(ctx)
+		if p.logins != 1 {
+			t.Fatalf("%v: retried while paused", o)
+		}
+	}
+}
+
+func TestSuccessBeforeRoutingWaits(t *testing.T) {
+	p := &fakePortal{results: []portal.Result{{OK: true, Warn: "等待生效"}}}
+	k, c, _ := setup(p, "a")
+	p.online = false
+	k.login(ctx, false)
+	p.online = false // authenticated but not routed yet
+	c.advance(30 * time.Second)
+	k.Tick(ctx)
+	if p.logins != 1 {
+		t.Fatalf("login resubmitted before the grace period: %d", p.logins)
+	}
+}

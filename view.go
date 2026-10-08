@@ -231,6 +231,9 @@ func (m *model) statusCard(c *ui.Context, t *ui.Theme, s status) {
 		if m.st.RetCode != 0 {
 			ui.Text(c, fmt.Sprintf("ret_code=%d：%s", m.st.RetCode, portal.Advice(m.st.RetCode))).
 				FontSize(12).Wrap().Padding(8, 10).Radius(8).Background(colSoyo.Alpha(0.22))
+		} else if m.st.Pause == keeper.PausedByServer && m.st.LastError != "" {
+			ui.Text(c, m.st.LastError).
+				FontSize(12).Wrap().Padding(8, 10).Radius(8).Background(colSoyo.Alpha(0.22))
 		}
 		ui.Grid(c).ColumnTracks(ui.Fixed(56), ui.Fr(1)).GapX(12).GapY(4).Children(func() {
 			kv := func(k, v string) {

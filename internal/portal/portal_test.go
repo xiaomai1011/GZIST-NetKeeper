@@ -151,8 +151,8 @@ func TestLoginTriesCombinations(t *testing.T) {
 	if err != nil || !r.OK {
 		t.Fatalf("r=%+v err=%v", r, err)
 	}
-	// suffix: 2 ACs × 2 MACs = 4, then no suffix: AC1×2 + AC2 first MAC×... = 4+4 = 8
-	if n := len(f.requests()); n != 8 {
+	// suffix: 3 ACs × 2 MACs = 6, then no suffix: first success after one AC
+	if n := len(f.requests()); n != 12 {
 		t.Fatalf("got %d requests", n)
 	}
 }
@@ -171,7 +171,7 @@ func TestLoginPortalFallbackRetCodes(t *testing.T) {
 			t.Fatalf("code %d: r=%+v err=%v", code, r, err)
 		}
 		reqs := f.requests()
-		if last := reqs[len(reqs)-1]; !strings.Contains(last, "c=Portal") || len(reqs) != 9 {
+		if last := reqs[len(reqs)-1]; !strings.Contains(last, "c=Portal") || len(reqs) != 13 {
 			t.Fatalf("code %d: %d requests, last %s", code, len(reqs), last)
 		}
 		if Advice(code) == "" {
@@ -278,7 +278,7 @@ func TestLoginMismatchSkipsProbe(t *testing.T) {
 		t.Fatalf("r=%+v err=%v", r, err)
 	}
 	// Seven mismatches are skipped without waiting; only success() sleeps.
-	if n := len(f.requests()); n != 8 || sleeps != 1 {
+	if n := len(f.requests()); n != 12 || sleeps != 1 {
 		t.Fatalf("%d requests, %d sleeps", n, sleeps)
 	}
 }
@@ -516,8 +516,8 @@ func TestLoginPortalSuccessBeforeRoutingRemembersSession(t *testing.T) {
 	if err != nil || !r.OK || r.Outcome != Success || r.Warn == "" {
 		t.Fatalf("r=%+v err=%v", r, err)
 	}
-	if n := len(f.requests()); n != 9 {
-		t.Fatalf("success resubmitted: %d requests, want 9", n)
+	if n := len(f.requests()); n != 13 {
+		t.Fatalf("success resubmitted: %d requests, want 13", n)
 	}
 	want := Session{Suffixed: true, ACIP: "10.128.255.129", UserIP: "10.20.30.40", UserMAC: "AA-BB-CC-DD-EE-FF", PortalAPI: true}
 	if got, ok := f.client.LastSession(); !ok || got != want {

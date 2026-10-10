@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"sort"
 	"strings"
 	"testing"
@@ -165,8 +166,18 @@ func TestVerifyRejectsUnsafeStaging(t *testing.T) {
 			dir := stageFiles(t, map[string]string{"app.exe": "x"})
 			switch kind {
 			case "symlink":
-				if err := os.Symlink(filepath.Join(dir, "app.exe"), filepath.Join(dir, "link.txt")); err != nil {
+				link := filepath.Join(dir, "link.txt")
+				if err := os.Symlink(filepath.Join(dir, "app.exe"), link); err != nil {
+					if runtime.GOOS == "windows" {
+						// needs Administrator or Developer Mode on Windows
+						t.Skipf("os.Symlink unavailable: %v", err)
+					}
 					t.Fatal(err)
+				}
+				// Some sandboxes materialize symlinks as plain copies; without
+				// a real reparse point the reject-symlink path can't be tested.
+				if info, err := os.Lstat(link); err != nil || info.Mode()&os.ModeSymlink == 0 {
+					t.Skipf("environment does not honor symlinks (mode=%v)", info.Mode())
 				}
 			case "directory":
 				if err := os.Mkdir(filepath.Join(dir, "nested"), 0700); err != nil {
@@ -179,7 +190,13 @@ func TestVerifyRejectsUnsafeStaging(t *testing.T) {
 			case "root-symlink", "root-symlink-slash":
 				link := filepath.Join(t.TempDir(), "feed")
 				if err := os.Symlink(dir, link); err != nil {
+					if runtime.GOOS == "windows" {
+						t.Skipf("os.Symlink unavailable: %v", err)
+					}
 					t.Fatal(err)
+				}
+				if info, err := os.Lstat(link); err != nil || info.Mode()&os.ModeSymlink == 0 {
+					t.Skipf("environment does not honor symlinks (mode=%v)", info.Mode())
 				}
 				dir = link
 				if kind == "root-symlink-slash" {

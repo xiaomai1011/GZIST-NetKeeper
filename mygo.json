@@ -1,7 +1,7 @@
 {
   "name": "GZIST NetKeeper",
   "identifier": "io.github.xiaomai1011.gzist-netkeeper",
-  "version": "2.0.2",
+  "version": "2.0.3",
   "copyright": "Copyright © 2026 zzstar101. MIT License.",
   "out": "build",
   "updates": {
@@ -11,8 +11,12 @@
   "linux": {
     "maintainer": "zzstar101 <zzstar101@users.noreply.github.com>",
     "comment": "广州理工学院校园网自动登录与保活",
-    "categories": ["Network"],
-    "depends": ["libayatana-appindicator3-1"],
+    "categories": [
+      "Network"
+    ],
+    "depends": [
+      "libayatana-appindicator3-1"
+    ],
     "command": "gzist-netkeeper"
   }
 }

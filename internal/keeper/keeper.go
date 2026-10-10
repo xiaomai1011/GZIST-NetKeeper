@@ -208,12 +208,7 @@ func (k *Keeper) Tick(ctx context.Context) {
 	account, _ := k.Creds()
 	s := k.State()
 	if online {
-		k.update(func(s *State) {
-			if !s.Online && s.Phase != Checking {
-				k.log("网络已连通")
-			}
-			s.Phase, s.Online, s.Failures, s.NextRetry, s.Notice = Online, true, 0, time.Time{}, ""
-		})
+		k.markOnline()
 		return
 	}
 	if s.Online {
@@ -230,7 +225,29 @@ func (k *Keeper) Tick(ctx context.Context) {
 	k.login(ctx, false)
 }
 
+// markOnline does not submit credentials or record a new login. A recovered
+// connection clears old failure messages but preserves explicit logout pauses.
+func (k *Keeper) markOnline() {
+	if !k.State().Online {
+		k.log("检测到已在线，跳过登录，仅执行在线监测")
+	}
+	k.update(func(s *State) {
+		s.Phase, s.Online = Online, true
+		s.Failures, s.RetCode, s.LastError, s.Notice = 0, 0, "", ""
+		s.NextRetry = time.Time{}
+	})
+}
+
 func (k *Keeper) login(ctx context.Context, manual bool) {
+	// Tick already checks automatic attempts. Manual clicks need the same
+	// guard BEFORE credential validation, even when no account is configured.
+	if manual && k.Portal.Online(ctx) {
+		k.markOnline()
+		return
+	}
+	if ctx.Err() != nil {
+		return
+	}
 	account, password := k.Creds()
 	if account == "" || password == "" {
 		k.log("请先填写学号和密码")
@@ -257,7 +274,10 @@ func (k *Keeper) login(ctx context.Context, manual bool) {
 			k.log("登录成功")
 		}
 		k.update(func(s *State) {
-			s.Phase, s.Online, s.LastLogin = Online, true, now
+			s.Phase, s.Online = Online, true
+			if !res.AlreadyOnline {
+				s.LastLogin = now
+			}
 			s.LastError, s.RetCode, s.Failures, s.NextRetry, s.Pause = "", 0, 0, time.Time{}, NotPaused
 			s.Notice = res.Warn
 			if res.Warn != "" {

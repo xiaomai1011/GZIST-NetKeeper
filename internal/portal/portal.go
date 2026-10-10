@@ -283,19 +283,76 @@ func (c *Client) probe(ctx context.Context, raw string) error {
 	if err != nil {
 		return err
 	}
+	if want.Scheme != "https" || want.Hostname() == "" {
+		return errors.New("在线探测必须使用 HTTPS")
+	}
 	ctx, cancel := context.WithTimeout(ctx, 4*time.Second)
 	defer cancel()
-	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, raw, nil)
-	resp, err := c.Probe.Do(req)
+	client := *c.Probe
+	// Never follow an online probe into a plaintext or different-host portal.
+	// Keep the caller's redirect policy as well as the standard hop limit.
+	client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
+		if req.URL.Scheme != "https" || req.URL.Hostname() != want.Hostname() {
+			return errors.New("在线探测被重定向到其他站点或非 HTTPS 地址")
+		}
+		if c.Probe.CheckRedirect != nil {
+			return c.Probe.CheckRedirect(req, via)
+		}
+		if len(via) >= 10 {
+			return errors.New("在线探测重定向次数过多")
+		}
+		return nil
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, raw, nil)
 	if err != nil {
 		return err
 	}
-	io.Copy(io.Discard, io.LimitReader(resp.Body, 64<<10))
-	resp.Body.Close()
-	if got := resp.Request.URL.Hostname(); got != want.Hostname() {
-		return fmt.Errorf("被重定向到 %s", got)
+	resp, err := client.Do(req)
+	// Some campus middleboxes reject modern ClientHello messages even when
+	// the connection is already authenticated. Retry only a handshake_failure
+	// alert, within the SAME deadline, using verified TLS 1.2. This is not a
+	// retry for certificate errors and never affects portal/login requests.
+	var remote *net.OpError
+	if ctx.Err() == nil && errors.As(err, &remote) && remote.Op == "remote error" && remote.Err.Error() == "tls: handshake failure" {
+		if transport := compatibleProbeTransport(c.Probe); transport != nil {
+			defer transport.CloseIdleConnections()
+			client.Transport = transport
+			resp, err = client.Do(req.Clone(ctx))
+		}
 	}
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.Request.URL.Scheme != "https" || resp.Request.URL.Hostname() != want.Hostname() || resp.TLS == nil {
+		return errors.New("在线探测未得到原站点的 HTTPS 响应")
+	}
+	io.Copy(io.Discard, io.LimitReader(resp.Body, 64<<10))
 	return nil
+}
+
+// compatibleProbeTransport preserves trust roots, certificate callbacks and
+// proxy policy. It never mutates the shared transport or relaxes an explicitly
+// configured TLS 1.3 minimum; custom transports/dialers are not replaced.
+func compatibleProbeTransport(client *http.Client) *http.Transport {
+	base, ok := client.Transport.(*http.Transport)
+	if !ok || base.DialTLSContext != nil || base.DialTLS != nil {
+		return nil
+	}
+	transport := base.Clone()
+	cfg := transport.TLSClientConfig
+	if cfg == nil {
+		cfg = &tls.Config{}
+	}
+	if cfg.MinVersion > tls.VersionTLS12 || (cfg.MaxVersion != 0 && cfg.MaxVersion <= tls.VersionTLS12) {
+		return nil
+	}
+	cfg.MinVersion, cfg.MaxVersion = tls.VersionTLS12, tls.VersionTLS12
+	if len(cfg.CurvePreferences) == 0 {
+		cfg.CurvePreferences = []tls.CurveID{tls.X25519, tls.CurveP256, tls.CurveP384}
+	}
+	transport.TLSClientConfig = cfg
+	return transport
 }
 
 var (

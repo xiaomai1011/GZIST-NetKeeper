@@ -34,8 +34,11 @@ const (
 	DefaultHijackURL  = "http://www.baidu.com"
 )
 
-// DefaultACIPs are the access controllers seen on campus.
-var DefaultACIPs = []string{"10.128.255.143", "10.128.255.129"}
+// DefaultACIPs are the access controllers seen on campus. Different
+// dorms / uplinks report different ones via the hijack redirect; when the
+// hijack is not visible we try them all (10.128.255.142 was observed on
+// the 10.30.5.x wired segment).
+var DefaultACIPs = []string{"10.128.255.142", "10.128.255.143", "10.128.255.129"}
 
 // DefaultProbeURLs are fetched over HTTPS; only a valid certificate for the
 // expected host proves that the gateway is not hijacking us.

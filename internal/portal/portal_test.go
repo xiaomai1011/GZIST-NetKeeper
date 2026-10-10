@@ -11,6 +11,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"golang.org/x/text/encoding/simplifiedchinese"
 )
 
 // fakeCampus simulates the gateway, the portal and the outside internet.
@@ -582,4 +584,39 @@ func TestMACForms(t *testing.T) {
 	if got := NormalizeMAC("aa-bb-cc-dd-ee-ff"); got != "AABBCCDDEEFF" {
 		t.Fatal(got)
 	}
+}
+
+// The campus portal answers in GBK while claiming UTF-8 in its Content-Type.
+// The raw bytes used to reach the logs as garbage; they must be re-encoded
+// so the human-readable reason inside msga survives.
+func TestLoginDecodesGBKPortalErrors(t *testing.T) {
+	f := newFake(t)
+	toGBK := func(s string) string {
+		b, err := simplifiedchinese.GB18030.NewEncoder().Bytes([]byte(s))
+		if err != nil {
+			t.Fatalf("gbk encode: %v", err)
+		}
+		return string(b) // Go strings hold arbitrary bytes
+	}
+	seen := ""
+	f.handler = func(q map[string]string) string {
+		body := toGBK("<script>msga='Portal3:账号或密码错误,请重新输入';</script>")
+		seen = body
+		return body
+	}
+	r, err := f.client.Login(context.Background(), "2023001", "wrong-pass")
+	if err != nil {
+		t.Fatalf("err=%v", err)
+	}
+	if r.OK {
+		t.Fatalf("must not succeed")
+	}
+	// The GBK-decoded reason must reach the logs — that is the whole point.
+	for _, l := range f.logs {
+		if strings.Contains(l, "账号或密码错误") {
+			return // the human-readable reason reached the logs
+		}
+	}
+	t.Fatalf("gbk reason missing from logs: %v", f.logs)
+	_ = seen
 }

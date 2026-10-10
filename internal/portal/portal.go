@@ -21,6 +21,9 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
+
+	"golang.org/x/text/encoding/simplifiedchinese"
 )
 
 // Defaults for the GZIST campus network.
@@ -447,6 +450,14 @@ func (c *Client) get(ctx context.Context, rawURL string, timeout time.Duration) 
 	}
 	if len(b) > 256<<10 {
 		return "", &responseError{errors.New("认证响应超过 256 KiB")}
+	}
+	// Dr.COM portals answer in GBK while their Content-Type claims UTF-8 —
+	// the raw bytes render as garbage in the logs. Re-encode so the error
+	// text inside msga actually reads.
+	if !utf8.Valid(b) {
+		if dec, derr := simplifiedchinese.GB18030.NewDecoder().Bytes(b); derr == nil {
+			b = dec
+		}
 	}
 	body := string(b)
 	return body, nil

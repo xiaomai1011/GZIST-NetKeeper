@@ -128,7 +128,7 @@ func TestLoginACSetting(t *testing.T) {
 		// Only the account with suffix, the AC from the redirect and the
 		// dashed MAC from the redirect work, like the real server.
 		if q["c"] == "ACSetting" && q["DDDDD"] == ",0,2023001" && q["upass"] == "p@ss word" &&
-			q["wlanacip"] == "10.128.255.142" && q["wlanusermac"] == "AA-BB-CC-DD-EE-FF" && q["wlanuserip"] == "10.20.30.40" {
+			q["wlanacip"] == "10.128.255.129" && q["wlanusermac"] == "AA-BB-CC-DD-EE-FF" && q["wlanuserip"] == "10.20.30.40" {
 			f.online.Store(true)
 			return "<script>msga='认证成功'</script>"
 		}
@@ -142,7 +142,7 @@ func TestLoginACSetting(t *testing.T) {
 	if len(reqs) != 1 {
 		t.Fatalf("expected first combination to win, got %d requests", len(reqs))
 	}
-	if !strings.Contains(reqs[0], "DDDDD=%2C0%2C2023001") || !strings.Contains(reqs[0], "upass=p%40ss%20word") || !strings.Contains(reqs[0], "wlanacip=10.128.255.142") {
+	if !strings.Contains(reqs[0], "DDDDD=%2C0%2C2023001") || !strings.Contains(reqs[0], "upass=p%40ss%20word") || !strings.Contains(reqs[0], "wlanacip=10.128.255.129") {
 		t.Fatalf("bad query %s", reqs[0])
 	}
 	for _, l := range f.logs {
@@ -165,9 +165,9 @@ func TestLoginTriesCombinations(t *testing.T) {
 	if err != nil || !r.OK {
 		t.Fatalf("r=%+v err=%v", r, err)
 	}
-	// suffix: 3 ACs × 2 MACs = 6, then no suffix until 143 with the plain
-	// MAC answers — 6 + 2 + 1 = 9 with the discovered 142 tried first
-	if n := len(f.requests()); n != 10 {
+	// All four fresh-129 forms precede fallback controllers. Six suffixed
+	// fallback forms, then two each for unsuffixed 142 and 143, total 14.
+	if n := len(f.requests()); n != 14 {
 		t.Fatalf("got %d requests", n)
 	}
 }
@@ -186,7 +186,7 @@ func TestLoginPortalFallbackRetCodes(t *testing.T) {
 			t.Fatalf("code %d: r=%+v err=%v", code, r, err)
 		}
 		reqs := f.requests()
-		if last := reqs[len(reqs)-1]; !strings.Contains(last, "c=Portal") || len(reqs) != 13 {
+		if last := reqs[len(reqs)-1]; !strings.Contains(last, "c=Portal") || len(reqs) != 17 {
 			t.Fatalf("code %d: %d requests, last %s", code, len(reqs), last)
 		}
 		if Advice(code) == "" {
@@ -292,8 +292,8 @@ func TestLoginMismatchSkipsProbe(t *testing.T) {
 	if err != nil || !r.OK {
 		t.Fatalf("r=%+v err=%v", r, err)
 	}
-	// Seven mismatches are skipped without waiting; only success() sleeps.
-	if n := len(f.requests()); n != 10 || sleeps != 1 {
+	// Thirteen mismatches are skipped without waiting; only success() sleeps.
+	if n := len(f.requests()); n != 14 || sleeps != 1 {
 		t.Fatalf("%d requests, %d sleeps", n, sleeps)
 	}
 }
@@ -333,7 +333,9 @@ func TestLoginRemembersCombination(t *testing.T) {
 	if r, err := f.client.Login(ctx, "2023001", "x"); err != nil || !r.OK {
 		t.Fatalf("r=%+v err=%v", r, err)
 	}
-	if n := len(f.requests()); n != 1 {
+	// The current hijack still reports 129: remembering fallback 143 must
+	// not override fresh evidence on the next login.
+	if n := len(f.requests()); n != 14 {
 		t.Fatalf("reconnect took %d requests", n)
 	}
 }
@@ -531,10 +533,10 @@ func TestLoginPortalSuccessBeforeRoutingRemembersSession(t *testing.T) {
 	if err != nil || !r.OK || r.Outcome != Success || r.Warn == "" {
 		t.Fatalf("r=%+v err=%v", r, err)
 	}
-	if n := len(f.requests()); n != 13 {
-		t.Fatalf("success resubmitted: %d requests, want 13", n)
+	if n := len(f.requests()); n != 17 {
+		t.Fatalf("success resubmitted: %d requests, want 17", n)
 	}
-	want := Session{Suffixed: true, ACIP: "10.128.255.142", UserIP: "10.20.30.40", UserMAC: "AA-BB-CC-DD-EE-FF", PortalAPI: true}
+	want := Session{Suffixed: true, ACIP: "10.128.255.129", UserIP: "10.20.30.40", UserMAC: "AA-BB-CC-DD-EE-FF", PortalAPI: true}
 	if got, ok := f.client.LastSession(); !ok || got != want {
 		t.Fatalf("session=%+v present=%v, want %+v", got, ok, want)
 	}
@@ -636,9 +638,9 @@ func TestLoginDecodesGBKPortalErrors(t *testing.T) {
 	_ = seen
 }
 
-// The root page names the caller's real AC even when the hijack redirect is
-// invisible; the discovered controller must be tried first.
-func TestDiscoverACPrependsRealController(t *testing.T) {
+// Root-page hints remain usable fallbacks but cannot override the current
+// hijack redirect, which describes the connection being authenticated.
+func TestDiscoverACDoesNotOverrideHijack(t *testing.T) {
 	f := newFake(t)
 	f.rootResponse.Store(`<script>AC="10.128.255.142";</script>`)
 	f.handler = func(q map[string]string) string {
@@ -653,7 +655,7 @@ func TestDiscoverACPrependsRealController(t *testing.T) {
 		t.Fatalf("r=%+v err=%v", r, err)
 	}
 	reqs := f.requests()
-	if !strings.Contains(reqs[0], "wlanacip=10.128.255.142") {
-		t.Fatalf("discovered AC not tried first: %s", reqs[0])
+	if !strings.Contains(reqs[0], "wlanacip=10.128.255.129") {
+		t.Fatalf("hijack AC not tried first: %s", reqs[0])
 	}
 }

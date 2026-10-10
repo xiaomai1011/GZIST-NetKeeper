@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -10,8 +11,10 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"sort"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 )
@@ -68,6 +71,11 @@ func TestPreflightRejectsBeforeNetwork(t *testing.T) {
 			case "symlink":
 				remove(name)
 				if err := os.Symlink(filepath.Join(dir, "install.sh"), filepath.Join(dir, name)); err != nil {
+					// Windows requires Developer Mode or SeCreateSymbolicLinkPrivilege.
+					// Skip only that environmental failure, not arbitrary I/O errors.
+					if runtime.GOOS == "windows" && errors.Is(err, syscall.Errno(1314)) {
+						t.Skipf("os.Symlink requires Windows privilege: %v", err)
+					}
 					t.Fatal(err)
 				}
 			case "directory":

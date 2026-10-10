@@ -1,7 +1,7 @@
 {
   "name": "GZIST NetKeeper",
   "identifier": "io.github.xiaomai1011.gzist-netkeeper",
-  "version": "2.1.2",
+  "version": "2.1.3",
   "copyright": "Copyright © 2026 zzstar101. MIT License.",
   "out": "build",
   "updates": {

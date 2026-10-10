@@ -15,6 +15,7 @@ import (
 	"math/rand/v2"
 	"net"
 	"net/http"
+	"net/netip"
 	"net/url"
 	"regexp"
 	"strconv"
@@ -38,7 +39,7 @@ const (
 // dorms / uplinks report different ones via the hijack redirect; when the
 // hijack is not visible we try them all (10.128.255.142 was observed on
 // the 10.30.5.x wired segment).
-var DefaultACIPs = []string{"10.128.255.142", "10.128.255.143", "10.128.255.129"}
+var DefaultACIPs = []string{"10.128.255.142", "10.128.255.143", "10.128.255.129", "10.128.255.144"}
 
 // DefaultProbeURLs are fetched over HTTPS; only a valid certificate for the
 // expected host proves that the gateway is not hijacking us.
@@ -358,41 +359,113 @@ func compatibleProbeTransport(client *http.Client) *http.Transport {
 	return transport
 }
 
+// Only complete, dotted IPv4 addresses are accepted; never a regex prefix of
+// a percent-encoded or malformed address.
+func validIPv4(s string) string {
+	ip, err := netip.ParseAddr(s)
+	if err != nil || !ip.Is4() {
+		return ""
+	}
+	return ip.String()
+}
+
+func infoFromURL(u *url.URL) Info {
+	if u == nil {
+		return Info{}
+	}
+	q := u.Query() // percent decoding happens exactly once
+	info := Info{UserIP: validIPv4(q.Get("wlanuserip")), ACIP: validIPv4(q.Get("wlanacip"))}
+	mac := strings.ToUpper(q.Get("wlanusermac"))
+	if len(mac) == 12 && strings.Trim(mac, "0123456789ABCDEF") == "" {
+		info.UserMAC = mac
+	} else if parsed, err := net.ParseMAC(mac); err == nil && len(parsed) == 6 {
+		info.UserMAC = DashedMAC(parsed.String())
+	}
+	return info
+}
+
+const discoveryBodyLimit = 32 << 10
+
 var (
-	reUserIP  = regexp.MustCompile(`wlanuserip=([\d.]+)`)
-	reUserMAC = regexp.MustCompile(`wlanusermac=([0-9A-Fa-f\-:]+)`)
-	reACIP    = regexp.MustCompile(`wlanacip=([\d.]+)`)
+	reDiscoveryToken = regexp.MustCompile(`[^\s"'<>` + "`" + `]+`)
+	reACAssignment   = regexp.MustCompile(`\bAC\s*=\s*(?:"([^"\r\n]*)"|'([^'\r\n]*)')`)
 )
+
+func mergeInfo(dst *Info, src Info) {
+	if dst.UserIP == "" {
+		dst.UserIP = src.UserIP
+	}
+	if dst.UserMAC == "" {
+		dst.UserMAC = src.UserMAC
+	}
+	if dst.ACIP == "" {
+		dst.ACIP = src.ACIP
+	}
+}
+
+// Inspect literal URLs in scripts, meta refreshes and links, without executing
+// JavaScript or fetching their targets. Work and allocation are bounded by the
+// body limit. Final HTTP URL parameters always outrank page hints.
+func infoFromPage(body string) Info {
+	if len(body) > discoveryBodyLimit {
+		return Info{}
+	}
+	var info Info
+	for _, token := range reDiscoveryToken.FindAllString(html.UnescapeString(body), -1) {
+		if strings.HasPrefix(strings.ToLower(token), "url=") {
+			token = token[4:]
+		}
+		if strings.HasPrefix(token, "wlanacip=") || strings.HasPrefix(token, "wlanuserip=") || strings.HasPrefix(token, "wlanusermac=") {
+			token = "?" + token
+		}
+		if u, err := url.Parse(token); err == nil {
+			mergeInfo(&info, infoFromURL(u))
+		}
+	}
+	if info.ACIP == "" {
+		for _, m := range reACAssignment.FindAllStringSubmatch(body, -1) {
+			if ac := validIPv4(strings.TrimSpace(m[1] + m[2])); ac != "" {
+				info.ACIP = ac
+				break
+			}
+		}
+	}
+	return info
+}
 
 // PortalInfo fetches a plain HTTP page and, if the gateway redirected it,
 // returns the parameters found in the final URL. hijacked is false when the
 // page loaded normally.
 func (c *Client) PortalInfo(ctx context.Context) (info Info, hijacked bool, err error) {
-	want, _ := url.Parse(c.HijackURL)
+	want, err := url.Parse(c.HijackURL)
+	if err != nil {
+		return Info{}, false, err
+	}
 	ctx, cancel := context.WithTimeout(ctx, 4*time.Second)
 	defer cancel()
-	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, c.HijackURL, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.HijackURL, nil)
+	if err != nil {
+		return Info{}, false, err
+	}
 	resp, err := c.HTTP.Do(req)
 	if err != nil {
 		return Info{}, false, err
 	}
-	io.Copy(io.Discard, io.LimitReader(resp.Body, 64<<10))
-	resp.Body.Close()
+	defer resp.Body.Close()
 	final := resp.Request.URL
-	if final.Hostname() == want.Hostname() {
-		return Info{}, false, nil
+	info = infoFromURL(final)
+	hijacked = final.Hostname() != want.Hostname() || info != (Info{})
+	// A valid redirect AC is sufficient evidence; a slow or broken login
+	// page body must not delay or discard it.
+	if info.ACIP != "" {
+		return info, hijacked, nil
 	}
-	s := final.String()
-	if m := reUserIP.FindStringSubmatch(s); m != nil {
-		info.UserIP = m[1]
+	b, err := io.ReadAll(io.LimitReader(resp.Body, discoveryBodyLimit+1))
+	if err != nil {
+		return info, hijacked, err
 	}
-	if m := reUserMAC.FindStringSubmatch(s); m != nil {
-		info.UserMAC = strings.ToUpper(m[1])
-	}
-	if m := reACIP.FindStringSubmatch(s); m != nil {
-		info.ACIP = m[1]
-	}
-	return info, true, nil
+	mergeInfo(&info, infoFromPage(string(b)))
+	return info, hijacked || info != (Info{}), nil
 }
 
 // escape matches .NET's Uri.EscapeDataString.
@@ -401,20 +474,33 @@ func escape(s string) string {
 }
 
 type params struct {
-	ip   string
-	acs  []string
-	macs []string
+	ip      string
+	acs     []string
+	macs    []string
+	freshAC string
 }
 
-func (c *Client) params(nic NIC, info Info) params {
-	p := params{ip: nic.IP}
-	if info.UserIP != "" {
-		p.ip = info.UserIP
+func (c *Client) params(nic NIC, info Info, rootAC ...string) params {
+	p := params{ip: nic.IP, freshAC: validIPv4(info.ACIP)}
+	if ip := validIPv4(info.UserIP); ip != "" {
+		p.ip = ip
 	}
+	// Current hijack evidence outranks root-page hints, then configured
+	// fallbacks. Build a local slice: discovery never changes shared ACIPs.
+	candidates := []string{info.ACIP}
+	candidates = append(candidates, rootAC...)
+	if p.freshAC == "" {
+		for _, ac := range rootAC {
+			if ac = validIPv4(ac); ac != "" {
+				p.freshAC = ac
+				break
+			}
+		}
+	}
+	candidates = append(candidates, c.ACIPs...)
 	seen := map[string]bool{}
-	// The dynamically discovered controller (already at the front of
-	// c.ACIPs) outranks whatever the hijack redirect carried, then the rest.
-	for _, ac := range append(c.ACIPs, info.ACIP) {
+	for _, candidate := range candidates {
+		ac := validIPv4(candidate)
 		if ac != "" && !seen[ac] {
 			seen[ac] = true
 			p.acs = append(p.acs, ac)
@@ -578,7 +664,10 @@ func (c *Client) discoverAC(ctx context.Context) string {
 		return ""
 	}
 	defer resp.Body.Close()
-	b, err := io.ReadAll(io.LimitReader(resp.Body, 32<<10))
+	if info := infoFromURL(resp.Request.URL); info.ACIP != "" {
+		return info.ACIP
+	}
+	b, err := io.ReadAll(io.LimitReader(resp.Body, discoveryBodyLimit+1))
 	if err != nil {
 		return ""
 	}
@@ -587,13 +676,7 @@ func (c *Client) discoverAC(ctx context.Context) string {
 			b = dec
 		}
 	}
-	if m := regexp.MustCompile(`AC="([0-9.]+)"`).FindSubmatch(b); m != nil && string(m[1]) != "" {
-		return string(m[1])
-	}
-	if m := regexp.MustCompile(`wlanacip=([0-9.]+)`).FindSubmatch(b); m != nil {
-		return string(m[1])
-	}
-	return ""
+	return infoFromPage(string(b)).ACIP
 }
 
 func clip(s string) string {
@@ -624,8 +707,22 @@ func (c *Client) combos(p params) []combo {
 			}
 		}
 	}
+	if p.freshAC != "" {
+		ordered := make([]combo, 0, len(out))
+		for _, cb := range out {
+			if cb.ac == p.freshAC {
+				ordered = append(ordered, cb)
+			}
+		}
+		for _, cb := range out {
+			if cb.ac != p.freshAC {
+				ordered = append(ordered, cb)
+			}
+		}
+		out = ordered
+	}
 	last, ok := c.LastSession()
-	if !ok || last.PortalAPI {
+	if !ok || last.PortalAPI || (p.freshAC != "" && last.ACIP != p.freshAC) {
 		return out
 	}
 	for i, cb := range out {
@@ -675,23 +772,17 @@ func (c *Client) Login(ctx context.Context, account, password string) (Result, e
 	default:
 		c.logf("未探测到门户劫持")
 	}
-	// Dynamic AC discovery: the root page names the caller's real controller
-	// even when the hijack redirect is invisible. Prepend so it is tried
-	// first; the defaults stay as fallback.
-	if ac := c.discoverAC(ctx); ac != "" {
-		c.logf("动态发现 AC: %s", ac)
-		c.mu.Lock()
-		ips := []string{ac}
-		for _, x := range c.ACIPs {
-			if x != ac {
-				ips = append(ips, x)
-			}
-		}
-		c.ACIPs = ips
-		c.mu.Unlock()
+	// Root discovery supplements (but never overrides) current hijack evidence.
+	rootAC := c.discoverAC(ctx)
+	if rootAC != "" {
+		c.logf("动态发现 AC: %s", rootAC)
 	}
-
-	p := c.params(nic, info)
+	p := c.params(nic, info, rootAC)
+	if p.freshAC != "" {
+		c.logf("优先使用当前发现的 AC: %s", p.freshAC)
+	} else {
+		c.logf("未发现有效 AC，使用配置的备用控制器")
+	}
 	if p.ip == "" {
 		return Result{}, ErrNoNIC
 	}

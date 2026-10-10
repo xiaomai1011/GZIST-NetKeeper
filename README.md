@@ -17,7 +17,7 @@
 ![Go](https://img.shields.io/badge/Go-1.27-00ADD8?logo=go&logoColor=white)
 [![MyGo](https://img.shields.io/badge/built%20with-MyGo-3388BB)](https://github.com/egoist/mygo)
 
-**[⬇️ 下载](https://github.com/xiaomai1011/GZIST-NetKeeper/releases/latest)** · [安装](#-安装) · [快速上手](#-快速上手) · [日常使用](#-日常使用) · [常见问题](#-常见问题)
+**[⬇️ 下载](https://dl2.nerv-base.com/)** · [GitHub 备用](https://github.com/xiaomai1011/GZIST-NetKeeper/releases/latest) · [安装](#-安装) · [快速上手](#-快速上手) · [日常使用](#-日常使用) · [常见问题](#-常见问题)
 
 </div>
 
@@ -35,14 +35,20 @@
 
 ## 📦 安装
 
-到 **[Releases 页面](https://github.com/xiaomai1011/GZIST-NetKeeper/releases/latest)** 下载对应系统的文件。文件名里的 `x64` / `amd64` 是常见的 Intel、AMD 电脑，`arm64` 是 Apple M 系列芯片和 ARM 电脑：
+到 **[下载站](https://dl2.nerv-base.com/)** 下载对应系统的文件，也可使用 [GitHub Releases 备用入口](https://github.com/xiaomai1011/GZIST-NetKeeper/releases/latest)。文件名里的 `x64` / `amd64` 是常见的 Intel、AMD 电脑，`arm64` 是 Apple M 系列芯片和 ARM 电脑：
 
 | 系统 | 选哪个文件 | 怎么装 |
 |---|---|---|
 | **Windows 10 / 11** | `GZIST-NetKeeper-x.y.z-windows-x64-setup.exe`（骁龙等 ARM 电脑选 `arm64`） | 双击安装，**不需要管理员权限** |
 | **macOS** | `GZIST-NetKeeper-x.y.z-macos-arm64.dmg`（M 系列芯片）/ `-macos-x64.dmg`（Intel） | 打开 dmg，把 App 拖进「应用程序」 |
 | **Linux（Debian / Ubuntu）** | `gzist-netkeeper_x.y.z_amd64.deb`（ARM 选 `arm64`） | `sudo apt install ./gzist-netkeeper_*.deb` |
-| **Linux（其他发行版）** | 无需下载，一行命令安装（会自动更新） | `curl -fsSL https://github.com/xiaomai1011/GZIST-NetKeeper/releases/latest/download/install.sh \| sh` |
+| **Linux（其他发行版）** | 下载匹配架构的 `.tar.gz` 及 `install.sh`，核对来源与校验和 | `sh install.sh ./对应架构.tar.gz` |
+
+### GitHub 在校内下载困难？
+
+使用维护者控制的 **[dl2.nerv-base.com 下载站](https://dl2.nerv-base.com/)**，由 R2 + EdgeOne 提供文件，不依赖 GitHub API 获取下载列表。GitHub 保留为备用；下载速度与校园网可达性仍需当地实测，不保证服务可用性。
+
+**从 v2.0.2 起包含本次登录错误处理修复，并使用新更新源。** 原版 v2.0.1 仍内置 GitHub 地址；旧客户端须获得一次过渡更新或手动安装 v2.0.2 及更新版本后才能迁移。免费计划限制、维护与发布流程见 [下载源说明](<docs/release-mirror.md>)。勿使用来源不明的公共代理安装客户端。
 
 ### 第一次打开被系统拦住？
 
@@ -117,7 +123,7 @@
 ### 自动更新
 
 程序会在联网后检查新版本，之后每 6 小时检查一次。新版本会在后台下载好，然后在托盘菜单和主窗口中提示 **重启以更新**，点一下就会完成更新。
-通过 deb 安装的版本只会提醒，请用 `apt` 或重新下载 deb 来升级。
+通过 deb 等包管理器安装、或安装位置不可写的版本不会自行覆盖安装，也不保证有内置更新通知；请用包管理器或重新下载 deb 来升级。自动更新地址在构建时确定；后续构建使用 `https://dl2.nerv-base.com`，已发布的原版 v2.0.1 仍使用 GitHub。
 
 ## ❓ 常见问题
 
@@ -161,7 +167,7 @@ TUN 模式（虚拟网卡）的 VPN 会接管系统路由，网关的认证跳�
 
 密码保存在系统自带的凭据库里：macOS 是 **钥匙串**，Windows 是 **凭据管理器**，Linux 是 **Secret Service**（GNOME Keyring、KWallet 等）。
 如果系统里没有可用的凭据库（常见于没有桌面环境的 Linux），会退回到数据目录下的一个仅本人可读（`0600`）的文件，界面上会提示这一点。
-程序只会与学校的认证服务器通信，检查更新时会访问 GitHub，不会上传任何数据。
+登录信息只发送给学校认证服务器；网络检测会访问百度、QQ，检查更新会访问构建时配置的下载源（新构建为 `dl2.nerv-base.com`，旧版为 GitHub）。不会向下载源发送校园网账号、密码或诊断日志。
 
 需要注意：Dr.COM 认证页本身是通过 HTTP（`http://10.0.10.252:801`）明文提交学号和密码的，网页登录也一样。系统凭据库只保护密码在本机的存储，无法改变校园认证链路自身的明文传输属性。
 </details>
@@ -218,7 +224,7 @@ go run ./tools/genicon               # 重新生成 resources/icon.png
 
 1. 修改 `mygo.json` 中的 `version`，提交后打标签并推送，例如 `git tag v2.0.1 && git push origin main v2.0.1`；
 2. [release.yml](.github/workflows/release.yml) 会先检查标签和 `version` 是否一致并跑测试，然后构建 6 个目标、签名，给安装包加上架构后缀，再上传到同名的 Release 草稿；
-3. 构建全部成功后，CI 会自动发布这个 Release。已安装的客户端从 `releases/latest` 读取更新清单，完成自动更新。
+3. CI 只允许高于当前下载源版本的稳定版，并拒绝覆盖已公开 Release。构建后核验六平台资产及归档签名、保存静态源 artifact，先上传 R2 版本化包并验证 EdgeOne 公网字节，再发布更新清单；全部公网校验通过后才公开 GitHub Release。缺少签名密钥、R2 配置、资产或验证失败都会停止发布。新构建从 `dl2.nerv-base.com` 读取更新清单；迁移、费用限制及失败恢复见 [下载源说明](<docs/release-mirror.md>)。
 
 更新签名使用 `mygo.json` 里 `updates.publicKey` 对应的私钥，私钥保存在仓库 Secret `MYGO_UPDATER_PRIVATE_KEY` 中。**私钥丢失后，已安装的客户端将无法再自动更新**，请妥善备份。
 

@@ -386,6 +386,195 @@ func TestLogoutNoACIPs(t *testing.T) {
 	}
 }
 
+func TestLoginPreservesErrorsFromBothInterfaces(t *testing.T) {
+	f := newFake(t)
+	f.handler = func(q map[string]string) string {
+		if q["c"] == "ACSetting" {
+			return `<script>msga='Portal接入控制器拒绝请求';</script>`
+		}
+		return `<!DOCTYPE html><html><title>系统发生错误</title></html>`
+	}
+	r, err := f.client.Login(context.Background(), "test", "secret")
+	if err != nil || r.OK || !strings.Contains(r.Msg, "Portal接入控制器拒绝请求") || !strings.Contains(r.Msg, "系统发生错误") {
+		t.Fatalf("lost server errors: r=%+v err=%v", r, err)
+	}
+}
+
+func TestLoginPortalContinuesAfterUnexpectedResponse(t *testing.T) {
+	for _, body := range []string{`<html><title>系统发生错误</title></html>`, ``, `dr1003({"unexpected":true})`, `dr1003({"result":"10"})`} {
+		t.Run(body, func(t *testing.T) {
+			f := newFake(t)
+			calls := 0
+			f.handler = func(q map[string]string) string {
+				if q["c"] != "Portal" {
+					return ""
+				}
+				calls++
+				if calls == 1 {
+					return body
+				}
+				f.online.Store(true)
+				return `dr1003({"result":"1","msg":"认证成功"})`
+			}
+			r, err := f.client.Login(context.Background(), "test", "secret")
+			if err != nil || !r.OK || calls != 2 {
+				t.Fatalf("r=%+v err=%v Portal calls=%d, want 2", r, err, calls)
+			}
+		})
+	}
+}
+
+func TestLoginPreservesACErrorWhenFallbackUnavailable(t *testing.T) {
+	f := newFake(t)
+	f.portal.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("c") == "ACSetting" {
+			fmt.Fprint(w, `<script>msga='明确的认证失败原因';</script>`)
+			return
+		}
+		w.WriteHeader(http.StatusServiceUnavailable)
+		fmt.Fprint(w, `<title>维护中</title>`)
+	})
+	r, err := f.client.Login(context.Background(), "test", "secret")
+	if err != nil || r.OK || !strings.Contains(r.Msg, "明确的认证失败原因") || !strings.Contains(r.Msg, "503") {
+		t.Fatalf("r=%+v err=%v", r, err)
+	}
+}
+
+func TestLoginRejectsHTTPSuccessBodyOnErrorStatus(t *testing.T) {
+	f := newFake(t)
+	f.portal.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadGateway)
+		fmt.Fprint(w, `dr1003({"result":"1"})`)
+	})
+	r, err := f.client.Login(context.Background(), "test", "secret")
+	if r.OK || err != nil || !strings.Contains(r.Msg, "502") {
+		t.Fatalf("r=%+v err=%v", r, err)
+	}
+}
+
+func TestLoginNetworkErrorDoesNotLeakPassword(t *testing.T) {
+	f := newFake(t)
+	f.client.PortalBase = "http://127.0.0.1:1/eportal/"
+	// Exercise credential-bearing HTTP requests, not the earlier TCP check.
+	f.client.Preflight = nil
+	password := "secret-password-123 &?"
+	_, err := f.client.Login(context.Background(), "test", password)
+	if !errors.Is(err, ErrNoResponse) {
+		t.Fatalf("err=%v", err)
+	}
+	logs := strings.Join(f.logs, "\n")
+	if !strings.Contains(logs, "ACSetting 登录:") || !strings.Contains(logs, "Portal 登录:") || !strings.Contains(logs, "请求失败:") {
+		t.Fatalf("did not exercise both HTTP transports: %s", logs)
+	}
+	for _, secret := range []string{password, escape(password), "secret-password-123"} {
+		if strings.Contains(logs, secret) {
+			t.Fatalf("password leaked: %s", logs)
+		}
+	}
+}
+
+func TestLoginEmptyHTTPError(t *testing.T) {
+	f := newFake(t)
+	f.portal.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(503) })
+	r, err := f.client.Login(context.Background(), "test", "secret")
+	if err != nil || !strings.Contains(r.Msg, "503") {
+		t.Fatalf("r=%+v err=%v", r, err)
+	}
+}
+
+func TestParsePortal(t *testing.T) {
+	for _, body := range []string{`{"result":1}`, `dr1003({"result":"1"});`, `dr1003 ({"result":1}) ;`, "\ufeff dr1003( {\"result\":1} ) ;"} {
+		r, ok := parsePortal(body)
+		if !ok || !r.OK {
+			t.Errorf("rejected %q: %+v", body, r)
+		}
+	}
+	for _, body := range []string{`other({"result":1})`, `<html>{"result":1}</html>`, `{"result":10}`, `{"result":true}`} {
+		if _, ok := parsePortal(body); ok {
+			t.Errorf("accepted %q", body)
+		}
+	}
+	for _, body := range []string{`{"result":0,"ret_code":8,"msg":"\u5bc6\u7801"}`, `{"result":"0","ret_code":"8","msg":"密码"}`} {
+		r, ok := parsePortal(body)
+		if !ok || r.OK || r.RetCode != 8 || r.Msg != "密码" {
+			t.Errorf("%q: %+v", body, r)
+		}
+	}
+}
+
+func TestLoginPortalSuccessBeforeRoutingRemembersSession(t *testing.T) {
+	f := newFake(t)
+	f.handler = func(q map[string]string) string {
+		if q["c"] == "Portal" {
+			return "\ufeff dr1003 ( {\"result\":1,\"msg\":\"认证成功\"} ) ;"
+		}
+		return ""
+	}
+	r, err := f.client.Login(context.Background(), "test", "secret")
+	if err != nil || !r.OK || r.Outcome != Success || r.Warn == "" {
+		t.Fatalf("r=%+v err=%v", r, err)
+	}
+	if n := len(f.requests()); n != 9 {
+		t.Fatalf("success resubmitted: %d requests, want 9", n)
+	}
+	want := Session{Suffixed: true, ACIP: "10.128.255.129", UserIP: "10.20.30.40", UserMAC: "AA-BB-CC-DD-EE-FF", PortalAPI: true}
+	if got, ok := f.client.LastSession(); !ok || got != want {
+		t.Fatalf("session=%+v present=%v, want %+v", got, ok, want)
+	}
+}
+
+func TestLoginPortalContinuesAfterHTTPError(t *testing.T) {
+	f := newFake(t)
+	calls := 0
+	f.portal.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("c") != "Portal" {
+			return
+		}
+		calls++
+		if calls == 1 {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			fmt.Fprint(w, `dr1003({"result":1})`)
+			return
+		}
+		fmt.Fprint(w, `dr1003({"result":1})`)
+	})
+	r, err := f.client.Login(context.Background(), "test", "secret")
+	if err != nil || !r.OK || r.Outcome != Success || calls != 2 {
+		t.Fatalf("r=%+v err=%v Portal calls=%d, want 2", r, err, calls)
+	}
+	if got, ok := f.client.LastSession(); !ok || !got.PortalAPI || got.UserMAC != "AABBCCDDEEFF" {
+		t.Fatalf("did not cache the successful fallback candidate: %+v present=%v", got, ok)
+	}
+}
+
+func TestLoginClassifiesDecodedACMessage(t *testing.T) {
+	f := newFake(t)
+	f.handler = func(map[string]string) string {
+		return `<script>msga='ldap auth &#101;rror';</script>`
+	}
+	r, err := f.client.Login(context.Background(), "test", "secret")
+	if err != nil || r.OK || r.Outcome != BadCredential || r.Msg != "ldap auth error" || len(f.requests()) != 1 {
+		t.Fatalf("r=%+v err=%v requests=%d", r, err, len(f.requests()))
+	}
+}
+
+func TestGetBoundsResponseBody(t *testing.T) {
+	for _, size := range []int{256 << 10, (256 << 10) + 1} {
+		t.Run(fmt.Sprint(size), func(t *testing.T) {
+			f := newFake(t)
+			f.handler = func(map[string]string) string { return strings.Repeat("x", size) }
+			body, err := f.client.get(context.Background(), f.client.PortalBase, time.Second)
+			if size == 256<<10 {
+				if err != nil || len(body) != size {
+					t.Fatalf("len(body)=%d err=%v", len(body), err)
+				}
+			} else if err == nil || !receivedResponse(err) || !strings.Contains(err.Error(), "256 KiB") || body != "" {
+				t.Fatalf("len(body)=%d err=%v", len(body), err)
+			}
+		})
+	}
+}
+
 func TestMACForms(t *testing.T) {
 	if got := DashedMAC("aa:bb:cc:dd:ee:ff"); got != "AA-BB-CC-DD-EE-FF" {
 		t.Fatal(got)

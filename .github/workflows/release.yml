@@ -8,7 +8,8 @@ permissions:
   contents: write
 
 concurrency:
-  group: release-${{ github.ref }}
+  # All versions share mutable update manifests; never deploy tags concurrently.
+  group: release-publication
   cancel-in-progress: false
 
 jobs:
@@ -30,13 +31,51 @@ jobs:
         run: go test ./...
         env:
           CGO_ENABLED: "0"
+      - name: Require update signing key
+        env:
+          MYGO_UPDATER_PRIVATE_KEY: ${{ secrets.MYGO_UPDATER_PRIVATE_KEY }}
+        run: |
+          if [ -z "$MYGO_UPDATER_PRIVATE_KEY" ]; then
+            echo "::error::MYGO_UPDATER_PRIVATE_KEY is required for a release"
+            exit 1
+          fi
+      - name: Require R2 publication configuration
+        env:
+          R2_ACCOUNT_ID: ${{ vars.R2_ACCOUNT_ID }}
+          R2_BUCKET: ${{ vars.R2_BUCKET }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        run: |
+          for name in R2_ACCOUNT_ID R2_BUCKET R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY; do
+            if [ -z "${!name}" ]; then
+              echo "::error::missing $name"
+              exit 1
+            fi
+          done
+          test "$(jq -r '.updates.url' mygo.json)" = "https://dl2.nerv-base.com"
+      - name: Require a newer stable version than the public feed
+        env:
+          CGO_ENABLED: "0"
+        run: |
+          go run ./tools/feedcheck -mode upgrade \
+            -base-url "$(jq -r '.updates.url' mygo.json)" \
+            -version "$(jq -r '.version' mygo.json)"
       - name: Create draft release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if ! gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+          if existing="$(gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --json isDraft 2>/dev/null)"; then
+            if [ "$(jq -r '.isDraft' <<< "$existing")" != true ]; then
+              echo "::error::refusing to modify an already-published release; increase the version"
+              exit 1
+            fi
+          else
             gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft --verify-tag \
               --title "GZIST NetKeeper $GITHUB_REF_NAME" --generate-notes
+          fi
+          notes="docs/releases/$GITHUB_REF_NAME.md"
+          if [ -f "$notes" ]; then
+            gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --notes-file "$notes"
           fi
 
   build:
@@ -69,6 +108,17 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           MYGO_UPDATER_PRIVATE_KEY: ${{ secrets.MYGO_UPDATER_PRIVATE_KEY }}
+      - name: Require manifests for every target
+        env:
+          PLATFORMS: ${{ matrix.platform }}
+        run: |
+          for platform in ${PLATFORMS//,/ }; do
+            target="${platform/\//-}"
+            test -s "build/$target/update-$target.json" || {
+              echo "::error::missing signed update manifest for $target"
+              exit 1
+            }
+          done
       # mygo build names the installers of every architecture the same
       # ("GZIST NetKeeper 2.0.0.dmg", "GZIST NetKeeper Setup 2.0.0.exe"), so
       # -upload would overwrite one with the other. Give them arch-specific
@@ -104,6 +154,69 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - name: Download and verify complete release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CGO_ENABLED: "0"
+        run: |
+          gh release download "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --dir release-assets
+          base="$(jq -r '.updates.url // empty' mygo.json)"
+          if [ -z "$base" ]; then
+            base="https://github.com/$GITHUB_REPOSITORY/releases/latest/download"
+          fi
+          go run ./tools/releasefeed -assets release-assets -out release-feed -base-url "$base"
+      - name: Upload checksum list
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Hash the original GitHub assets, not the rewritten staging manifests.
+          (cd release-assets && find . -maxdepth 1 -type f ! -name SHA256SUMS -printf '%f\0' | sort -z | xargs -0 sha256sum) > SHA256SUMS
+          gh release upload "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --clobber SHA256SUMS
+      - name: Save static feed for trusted hosting
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-feed-${{ github.ref_name }}
+          path: release-feed/
+          retention-days: 14
+      - name: Recheck stable publication order
+        env:
+          CGO_ENABLED: "0"
+        run: |
+          go run ./tools/feedcheck -mode upgrade \
+            -base-url "$(jq -r '.updates.url' mygo.json)" \
+            -version "$(jq -r '.version' mygo.json)"
+      - name: Publish immutable payloads to R2
+        timeout-minutes: 35
+        env:
+          CGO_ENABLED: "0"
+          R2_ACCOUNT_ID: ${{ vars.R2_ACCOUNT_ID }}
+          R2_BUCKET: ${{ vars.R2_BUCKET }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        run: go run ./tools/r2publish -dir release-feed -payloads-only
+      - name: Verify public payloads before exposing manifests
+        timeout-minutes: 12
+        env:
+          CGO_ENABLED: "0"
+        run: go run ./tools/feedcheck -dir release-feed -base-url "$(jq -r '.updates.url' mygo.json)" -payloads-only
+      - name: Publish verified feed controls to R2
+        timeout-minutes: 35
+        env:
+          CGO_ENABLED: "0"
+          R2_ACCOUNT_ID: ${{ vars.R2_ACCOUNT_ID }}
+          R2_BUCKET: ${{ vars.R2_BUCKET }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        run: go run ./tools/r2publish -dir release-feed
+      - name: Verify public EdgeOne delivery
+        timeout-minutes: 12
+        env:
+          CGO_ENABLED: "0"
+        run: go run ./tools/feedcheck -dir release-feed -base-url "$(jq -r '.updates.url' mygo.json)"
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}

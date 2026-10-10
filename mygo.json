@@ -1,12 +1,12 @@
 {
   "name": "GZIST NetKeeper",
   "identifier": "io.github.xiaomai1011.gzist-netkeeper",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "copyright": "Copyright © 2026 zzstar101. MIT License.",
   "out": "build",
   "updates": {
     "publicKey": "bX0o26sICXPZNejUCcYNBp0vBDx0fkuWblUPOuOrTs0=",
-    "github": "xiaomai1011/GZIST-NetKeeper"
+    "url": "https://dl2.nerv-base.com"
   },
   "linux": {
     "maintainer": "zzstar101 <zzstar101@users.noreply.github.com>",

@@ -7,8 +7,10 @@ package portal
 import (
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"html"
 	"io"
 	"math/rand/v2"
 	"net"
@@ -371,10 +373,10 @@ func uniq(a, b string) []string {
 }
 
 var (
-	reMsga    = regexp.MustCompile(`msga='([^']*)'`)
-	reResult  = regexp.MustCompile(`"result"\s*:\s*"?1"?`)
-	reRetCode = regexp.MustCompile(`"ret_code"\s*:\s*"?(\d+)`)
-	reMsg     = regexp.MustCompile(`"msg"\s*:\s*"([^"]*)"`)
+	reMsga   = regexp.MustCompile(`msga='([^']*)'`)
+	reResult = regexp.MustCompile(`"result"\s*:\s*(?:"1"|1)\s*[,}]`)
+	reTitle  = regexp.MustCompile(`(?is)<title[^>]*>(.*?)</title>`)
+	reTags   = regexp.MustCompile(`<[^>]*>`)
 
 	// What the ACSetting pages say. The success page is titled 认证成功页.
 	reSuccess  = regexp.MustCompile(`(?i)认证成功|登录成功|成功登录|Dr\.COMWebLoginID_3`)
@@ -387,7 +389,7 @@ var (
 // (msga), if any.
 func Classify(body string) (o Outcome, msg string) {
 	if m := reMsga.FindStringSubmatch(body); m != nil {
-		msg = strings.TrimSpace(m[1])
+		msg = strings.TrimSpace(html.UnescapeString(m[1]))
 	}
 	switch {
 	case msg == "":
@@ -408,6 +410,16 @@ func Classify(body string) (o Outcome, msg string) {
 	return Unknown, msg
 }
 
+// responseError records receipt of an HTTP response even with an empty body.
+type responseError struct{ err error }
+
+func (e *responseError) Error() string { return e.err.Error() }
+func (e *responseError) Unwrap() error { return e.err }
+func receivedResponse(err error) bool {
+	var e *responseError
+	return errors.As(err, &e)
+}
+
 func (c *Client) get(ctx context.Context, rawURL string, timeout time.Duration) (string, error) {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
@@ -417,11 +429,63 @@ func (c *Client) get(ctx context.Context, rawURL string, timeout time.Duration) 
 	}
 	resp, err := c.HTTP.Do(req)
 	if err != nil {
+		// net/http's URL error includes the query (and therefore the password).
+		var urlErr *url.Error
+		if errors.As(err, &urlErr) {
+			return "", urlErr.Err
+		}
 		return "", err
 	}
 	defer resp.Body.Close()
-	b, err := io.ReadAll(io.LimitReader(resp.Body, 256<<10))
-	return string(b), err
+	c.logf("  HTTP %d  Content-Type: %s", resp.StatusCode, resp.Header.Get("Content-Type"))
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return "", &responseError{fmt.Errorf("认证服务器 HTTP %d", resp.StatusCode)}
+	}
+	b, err := io.ReadAll(io.LimitReader(resp.Body, (256<<10)+1))
+	if err != nil {
+		return "", &responseError{err}
+	}
+	if len(b) > 256<<10 {
+		return "", &responseError{errors.New("认证响应超过 256 KiB")}
+	}
+	body := string(b)
+	return body, nil
+}
+
+// parsePortal accepts JSON or the expected JSONP callback, not HTML containing
+// JSON-looking text. Unknown responses must not stop the candidate loop.
+func parsePortal(body string) (Result, bool) {
+	s := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(body), "\ufeff"))
+	if rest, ok := strings.CutPrefix(s, "dr1003"); ok {
+		s = strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(rest), ";"))
+		if !strings.HasPrefix(s, "(") || !strings.HasSuffix(s, ")") {
+			return Result{}, false
+		}
+		s = strings.TrimSpace(s[1 : len(s)-1])
+	}
+	var fields struct {
+		Result  json.RawMessage `json:"result"`
+		RetCode json.RawMessage `json:"ret_code"`
+		Msg     string          `json:"msg"`
+	}
+	if err := json.Unmarshal([]byte(s), &fields); err != nil {
+		return Result{}, false
+	}
+	result := strings.Trim(string(fields.Result), `"`)
+	code, _ := strconv.Atoi(strings.Trim(string(fields.RetCode), `"`))
+	r := Result{OK: result == "1", RetCode: code, Msg: fields.Msg}
+	return r, result == "0" || result == "1" || code != 0
+}
+
+func unexpectedResponse(body string) string {
+	if title := reTitle.FindStringSubmatch(body); title != nil {
+		text := clip(html.UnescapeString(reTags.ReplaceAllString(title[1], "")))
+		return "认证接口返回 HTML 页面：" + text
+	}
+	if strings.TrimSpace(body) == "" {
+		return "认证接口返回空响应"
+	}
+	return "认证接口返回无法识别的响应（非有效 JSON/JSONP）"
 }
 
 func clip(s string) string {
@@ -509,6 +573,7 @@ func (c *Client) Login(ctx context.Context, account, password string) (Result, e
 	}
 
 	answered := false
+	acMsg, fallbackMsg := "", ""
 	// Scheme 1: ACSetting, the interface used since the 2026-09 upgrade.
 	for _, cb := range c.combos(p) {
 		if err := ctx.Err(); err != nil {
@@ -523,11 +588,16 @@ func (c *Client) Login(ctx context.Context, account, password string) (Result, e
 		body, err := c.get(ctx, u, 10*time.Second)
 		if err != nil {
 			c.logf("  请求失败: %v", err)
+			answered = answered || receivedResponse(err)
+			if acMsg == "" {
+				acMsg = err.Error()
+			}
 			continue
 		}
 		answered = true
 		out, msg := Classify(body)
 		if msg != "" {
+			acMsg = msg
 			c.logf("  服务器提示: %s", msg)
 		}
 		c.logf("  响应: %s", clip(body))
@@ -566,26 +636,46 @@ func (c *Client) Login(ctx context.Context, account, password string) (Result, e
 			body, err := c.get(ctx, u, 10*time.Second)
 			if err != nil {
 				c.logf("  请求失败: %v", err)
+				answered = answered || receivedResponse(err)
+				fallbackMsg = err.Error()
 				continue
 			}
+			answered = true
 			c.logf("  响应: %s", clip(body))
-			r := Result{}
-			if m := reRetCode.FindStringSubmatch(body); m != nil {
-				r.RetCode, _ = strconv.Atoi(m[1])
+			r, recognized := parsePortal(body)
+			if !recognized {
+				fallbackMsg = unexpectedResponse(body)
+				c.logf("  %s，尝试下一组参数", fallbackMsg)
+				continue
 			}
-			if m := reMsg.FindStringSubmatch(body); m != nil {
-				r.Msg = m[1]
-			}
-			if reResult.MatchString(body) {
-				r.OK, r.Outcome = true, Success
+			if r.OK {
+				r.Outcome = Success
 				c.remember(Session{Suffixed: true, ACIP: ac, MACPlain: NormalizeMAC(mac) == mac, UserIP: p.ip, UserMAC: mac, PortalAPI: true})
 				return c.success(ctx, r), nil
+			}
+			// A well-formed rejection is authoritative; do not hammer the
+			// account with additional candidates (including ret_code 2/8).
+			if r.Msg == "" {
+				r.Msg = acMsg
 			}
 			return r, nil
 		}
 	}
+	if err := ctx.Err(); err != nil {
+		return Result{}, err
+	}
 	if answered {
-		return Result{Msg: "服务器已响应但仍未上线"}, nil
+		var reasons []string
+		if acMsg != "" {
+			reasons = append(reasons, "ACSetting: "+acMsg)
+		}
+		if fallbackMsg != "" {
+			reasons = append(reasons, "Portal: "+fallbackMsg)
+		}
+		if len(reasons) == 0 {
+			reasons = append(reasons, "服务器已响应但仍未上线")
+		}
+		return Result{Msg: strings.Join(reasons, "；")}, nil
 	}
 	return Result{}, ErrNoResponse
 }

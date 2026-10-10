@@ -620,3 +620,27 @@ func TestLoginDecodesGBKPortalErrors(t *testing.T) {
 	t.Fatalf("gbk reason missing from logs: %v", f.logs)
 	_ = seen
 }
+
+// The root page names the caller's real AC even when the hijack redirect is
+// invisible; the discovered controller must be tried first.
+func TestDiscoverACPrependsRealController(t *testing.T) {
+	f := newFake(t)
+	f.handler = func(q map[string]string) string {
+		if q["c"] == "" && q["login_method"] == "" { // the root page
+			return `<script>AC="10.128.255.142";</script>`
+		}
+		if q["wlanacip"] == "10.128.255.142" && q["DDDDD"] == "2023001" {
+			f.online.Store(true)
+			return "<script>msga='认证成功'</script>"
+		}
+		return "<script>msga='Portal协议认证超时！'</script>"
+	}
+	r, err := f.client.Login(context.Background(), "2023001", "x")
+	if err != nil || !r.OK {
+		t.Fatalf("r=%+v err=%v", r, err)
+	}
+	reqs := f.requests()
+	if !strings.Contains(reqs[0], "wlanacip=10.128.255.142") {
+		t.Fatalf("discovered AC not tried first: %s", reqs[0])
+	}
+}

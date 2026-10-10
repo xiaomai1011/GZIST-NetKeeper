@@ -559,6 +559,41 @@ func unexpectedResponse(body string) string {
 	return "认证接口返回无法识别的响应（非有效 JSON/JSONP）"
 }
 
+// discoverAC asks the Dr.COM root page (port 80) which access controller
+// serves the caller. The server generates that page per request: for an
+// unauthenticated caller AC="<ip>" names their real controller; for one
+// already online it is empty. Works even when the gateway does not issue a
+// visible 302 hijack.
+func (c *Client) discoverAC(ctx context.Context) string {
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://"+c.PortalHost+"/", nil)
+	if err != nil {
+		return ""
+	}
+	resp, err := c.HTTP.Do(req)
+	if err != nil {
+		return ""
+	}
+	defer resp.Body.Close()
+	b, err := io.ReadAll(io.LimitReader(resp.Body, 32<<10))
+	if err != nil {
+		return ""
+	}
+	if !utf8.Valid(b) {
+		if dec, derr := simplifiedchinese.GB18030.NewDecoder().Bytes(b); derr == nil {
+			b = dec
+		}
+	}
+	if m := regexp.MustCompile(`AC="([0-9.]+)"`).FindSubmatch(b); m != nil && string(m[1]) != "" {
+		return string(m[1])
+	}
+	if m := regexp.MustCompile(`wlanacip=([0-9.]+)`).FindSubmatch(b); m != nil {
+		return string(m[1])
+	}
+	return ""
+}
+
 func clip(s string) string {
 	s = strings.Join(strings.Fields(s), " ")
 	if r := []rune(s); len(r) > 300 {
@@ -638,6 +673,22 @@ func (c *Client) Login(ctx context.Context, account, password string) (Result, e
 	default:
 		c.logf("未探测到门户劫持")
 	}
+	// Dynamic AC discovery: the root page names the caller's real controller
+	// even when the hijack redirect is invisible. Prepend so it is tried
+	// first; the defaults stay as fallback.
+	if ac := c.discoverAC(ctx); ac != "" {
+		c.logf("动态发现 AC: %s", ac)
+		c.mu.Lock()
+		ips := []string{ac}
+		for _, x := range c.ACIPs {
+			if x != ac {
+				ips = append(ips, x)
+			}
+		}
+		c.ACIPs = ips
+		c.mu.Unlock()
+	}
+
 	p := c.params(nic, info)
 	if p.ip == "" {
 		return Result{}, ErrNoNIC

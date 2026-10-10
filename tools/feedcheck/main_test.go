@@ -173,7 +173,7 @@ func TestVerifyRejectsUnsafeStaging(t *testing.T) {
 					t.Fatal(err)
 				}
 			case "unsafe":
-				if err := os.WriteFile(filepath.Join(dir, "bad?name.exe"), []byte("x"), 0600); err != nil {
+				if err := os.WriteFile(filepath.Join(dir, "bad name.exe"), []byte("x"), 0600); err != nil {
 					t.Fatal(err)
 				}
 			case "root-symlink", "root-symlink-slash":

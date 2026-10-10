@@ -412,7 +412,9 @@ func (c *Client) params(nic NIC, info Info) params {
 		p.ip = info.UserIP
 	}
 	seen := map[string]bool{}
-	for _, ac := range append([]string{info.ACIP}, c.ACIPs...) {
+	// The dynamically discovered controller (already at the front of
+	// c.ACIPs) outranks whatever the hijack redirect carried, then the rest.
+	for _, ac := range append(c.ACIPs, info.ACIP) {
 		if ac != "" && !seen[ac] {
 			seen[ac] = true
 			p.acs = append(p.acs, ac)

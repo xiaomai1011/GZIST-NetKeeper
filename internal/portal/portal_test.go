@@ -26,14 +26,27 @@ type fakeCampus struct {
 	portal, hijack, internet *httptest.Server
 	client                   *Client
 	logs                     []string
+	rootResponse             atomic.Value // string; served for GET / without a query
 }
 
 func newFake(t *testing.T) *fakeCampus {
 	f := &fakeCampus{t: t}
 	f.portal = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		f.mu.Lock()
-		f.reqs = append(f.reqs, r.URL.RawQuery)
-		f.mu.Unlock()
+		if r.URL.Path == "/" && r.URL.RawQuery == "" {
+			// the discovery probe: answer with the campus default (already
+			// online → empty AC) unless the test stages a response
+			if rr, ok := f.rootResponse.Load().(string); ok && rr != "" {
+				fmt.Fprint(w, rr)
+				return
+			}
+			fmt.Fprint(w, `<script>AC="";</script>`)
+			return
+		}
+		if r.URL.RawQuery != "" {
+			f.mu.Lock()
+			f.reqs = append(f.reqs, r.URL.RawQuery)
+			f.mu.Unlock()
+		}
 		q := map[string]string{}
 		for k, v := range r.URL.Query() {
 			q[k] = v[0]
@@ -69,6 +82,7 @@ func newFake(t *testing.T) *fakeCampus {
 
 	c := New(func(s string) { f.logs = append(f.logs, s) })
 	c.PortalBase = f.portal.URL + "/eportal/"
+	c.PortalHost = strings.TrimPrefix(f.portal.URL, "http://")
 	c.HijackURL = f.hijack.URL
 	c.ProbeURLs = []string{f.internet.URL}
 	c.Probe = f.internet.Client()
@@ -114,7 +128,7 @@ func TestLoginACSetting(t *testing.T) {
 		// Only the account with suffix, the AC from the redirect and the
 		// dashed MAC from the redirect work, like the real server.
 		if q["c"] == "ACSetting" && q["DDDDD"] == ",0,2023001" && q["upass"] == "p@ss word" &&
-			q["wlanacip"] == "10.128.255.129" && q["wlanusermac"] == "AA-BB-CC-DD-EE-FF" && q["wlanuserip"] == "10.20.30.40" {
+			q["wlanacip"] == "10.128.255.142" && q["wlanusermac"] == "AA-BB-CC-DD-EE-FF" && q["wlanuserip"] == "10.20.30.40" {
 			f.online.Store(true)
 			return "<script>msga='认证成功'</script>"
 		}
@@ -128,7 +142,7 @@ func TestLoginACSetting(t *testing.T) {
 	if len(reqs) != 1 {
 		t.Fatalf("expected first combination to win, got %d requests", len(reqs))
 	}
-	if !strings.Contains(reqs[0], "DDDDD=%2C0%2C2023001") || !strings.Contains(reqs[0], "upass=p%40ss%20word") {
+	if !strings.Contains(reqs[0], "DDDDD=%2C0%2C2023001") || !strings.Contains(reqs[0], "upass=p%40ss%20word") || !strings.Contains(reqs[0], "wlanacip=10.128.255.142") {
 		t.Fatalf("bad query %s", reqs[0])
 	}
 	for _, l := range f.logs {
@@ -151,8 +165,9 @@ func TestLoginTriesCombinations(t *testing.T) {
 	if err != nil || !r.OK {
 		t.Fatalf("r=%+v err=%v", r, err)
 	}
-	// suffix: 3 ACs × 2 MACs = 6, then no suffix: first success after one AC
-	if n := len(f.requests()); n != 12 {
+	// suffix: 3 ACs × 2 MACs = 6, then no suffix until 143 with the plain
+	// MAC answers — 6 + 2 + 1 = 9 with the discovered 142 tried first
+	if n := len(f.requests()); n != 10 {
 		t.Fatalf("got %d requests", n)
 	}
 }
@@ -278,7 +293,7 @@ func TestLoginMismatchSkipsProbe(t *testing.T) {
 		t.Fatalf("r=%+v err=%v", r, err)
 	}
 	// Seven mismatches are skipped without waiting; only success() sleeps.
-	if n := len(f.requests()); n != 12 || sleeps != 1 {
+	if n := len(f.requests()); n != 10 || sleeps != 1 {
 		t.Fatalf("%d requests, %d sleeps", n, sleeps)
 	}
 }
@@ -519,7 +534,7 @@ func TestLoginPortalSuccessBeforeRoutingRemembersSession(t *testing.T) {
 	if n := len(f.requests()); n != 13 {
 		t.Fatalf("success resubmitted: %d requests, want 13", n)
 	}
-	want := Session{Suffixed: true, ACIP: "10.128.255.129", UserIP: "10.20.30.40", UserMAC: "AA-BB-CC-DD-EE-FF", PortalAPI: true}
+	want := Session{Suffixed: true, ACIP: "10.128.255.142", UserIP: "10.20.30.40", UserMAC: "AA-BB-CC-DD-EE-FF", PortalAPI: true}
 	if got, ok := f.client.LastSession(); !ok || got != want {
 		t.Fatalf("session=%+v present=%v, want %+v", got, ok, want)
 	}
@@ -625,10 +640,8 @@ func TestLoginDecodesGBKPortalErrors(t *testing.T) {
 // invisible; the discovered controller must be tried first.
 func TestDiscoverACPrependsRealController(t *testing.T) {
 	f := newFake(t)
+	f.rootResponse.Store(`<script>AC="10.128.255.142";</script>`)
 	f.handler = func(q map[string]string) string {
-		if q["c"] == "" && q["login_method"] == "" { // the root page
-			return `<script>AC="10.128.255.142";</script>`
-		}
 		if q["wlanacip"] == "10.128.255.142" && q["DDDDD"] == "2023001" {
 			f.online.Store(true)
 			return "<script>msga='认证成功'</script>"

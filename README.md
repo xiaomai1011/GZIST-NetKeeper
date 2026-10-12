@@ -235,7 +235,7 @@ go run ./tools/genicon               # 重新生成 resources/icon.png
 ## 声明与致谢
 
 - 本工具只适配广州理工学院校园网，主要面向学习交流与校园便利场景，请遵守学校的网络使用规定。作者不对商业使用提供支持，但这不限制 MIT 许可证授予的任何权利。
-- 登录协议的血缘链：[gzist_tool](https://github.com/gzist-tool) 的[广州理工校园网自动登录脚本](https://github.com/gzist-tool/gzist_CAN)（原仓库已失效）→ [YT-O5](https://github.com/YT-O5) 的 [GZIST_CampusNet_AutoLogin](https://github.com/YT-O5/GZIST_CampusNet_AutoLogin) → GZIST-NetKeeper v1（xiaomai1011，适配 2026-09 新接口的 PowerShell 版）→ GZIST-NetKeeper v2（zzstar101，MyGo 三端重写）。最早那份源码的疑似原作者是 [CMJNB](https://github.com/CMJNB)；感谢沿途每一位作者，完整的版权与归属声明、源码存档地址见 [NOTICE](NOTICE)。
+- 登录协议的血缘链：[gzist_tool](https://github.com/gzist-tool) 的[广州理工校园网自动登录脚本](https://github.com/gzist-tool/gzist_CAN)（原仓库已失效）→ [YT-O5](https://github.com/YT-O5) 的 [GZIST_CampusNet_AutoLogin](https://github.com/YT-O5/GZIST_CampusNet_AutoLogin) → GZIST-NetKeeper v1（xiaomai1011，适配 2026-09 新接口的 PowerShell 版）→ GZIST-NetKeeper v2（zzstar101，MyGo 三端重写）。最早那份源码的疑似原作者是 [CMJNB](https://github.com/CMJNB)，源码存档于[上游仓库的 `Source code/gzist/`](https://github.com/YT-O5/GZIST_CampusNet_AutoLogin/tree/main/Source%20code/gzist)；感谢沿途每一位作者，完整的版权与归属声明见 [NOTICE](NOTICE)。
 
 ## License
 

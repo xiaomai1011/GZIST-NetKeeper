@@ -114,7 +114,25 @@ type Result struct {
 	RetCode       int // 0 when unknown
 	Msg           string
 	Warn          string
+	// Route says how the outcome was established, so the caller can tell
+	// "the portal accepted us" from "the internet came back anyway".
+	Route Route
+	// NotSubmitted is set when the automatic path refused to submit because
+	// the network state was not confirmed. Nothing was sent to the server.
+	NotSubmitted bool
 }
+
+// Route is the evidence behind a result.
+type Route int
+
+const (
+	// RouteUnconfirmed: no evidence either way.
+	RouteUnconfirmed Route = iota
+	// RoutePortal: the portal itself confirmed the login.
+	RoutePortal
+	// RouteProbe: the portal did not confirm, but the internet works.
+	RouteProbe
+)
 
 // Session is the set of parameters a login succeeded with.
 type Session struct {
@@ -134,6 +152,9 @@ type Client struct {
 	Suffix     string
 	ProbeURLs  []string
 	HijackURL  string
+	// Entries are the confirmed portal URLs a browser may be redirected to.
+	// Empty means DefaultPortalEntries; tests replace them.
+	Entries []PortalEntry
 
 	// HTTP is used for portal requests and hijack detection, Probe for the
 	// HTTPS online checks.
@@ -273,7 +294,13 @@ func DashedMAC(mac string) string {
 }
 
 // Online reports whether any probe URL loads over HTTPS from its own host.
-func (c *Client) Online(ctx context.Context) bool {
+// Online reports whether the internet is reachable right now. It is the plain
+// boolean form; Probe also says when the answer is "cannot tell", which is what
+// the keeper needs before submitting credentials.
+func (c *Client) Online(ctx context.Context) bool { return c.online(ctx) }
+
+// online is the connectivity half of Probe: one try per URL, no evidence.
+func (c *Client) online(ctx context.Context) bool {
 	for _, u := range c.ProbeURLs {
 		if c.probe(ctx, u) == nil {
 			return true
@@ -736,17 +763,29 @@ func (c *Client) combos(p params) []combo {
 	return out
 }
 
-// Login signs the account in. It returns an error only when no attempt got
-// an answer from the server.
-//
+// Login signs the account in on the user's explicit request. It may submit on a
+// network whose state is unknown, because the user asked for it; the attempt is
+// still subject to cancellation and to whatever the server answers.
+func (c *Client) Login(ctx context.Context, account, password string) (Result, error) {
+	return c.login(ctx, account, password, false)
+}
+
+// LoginAuto is the automatic path. It submits only when the portal gave
+// evidence that this device is unauthenticated (trusted redirect + parameters
+// matching the current interface); when the state cannot be determined it
+// reports NotSubmitted and submits nothing.
+func (c *Client) LoginAuto(ctx context.Context, account, password string) (Result, error) {
+	return c.login(ctx, account, password, true)
+}
+
 // Each ACSetting answer is classified: success ends the login even when
 // the internet is not routed yet, a credential error ends it without trying
 // other parameters, a parameter mismatch moves on to the next combination,
 // and anything else is settled by probing the internet.
-func (c *Client) Login(ctx context.Context, account, password string) (Result, error) {
-	if c.Online(ctx) {
+func (c *Client) login(ctx context.Context, account, password string, auto bool) (Result, error) {
+	if c.online(ctx) {
 		c.logf("已在线，无需登录")
-		return Result{OK: true, AlreadyOnline: true}, nil
+		return Result{OK: true, AlreadyOnline: true, Route: RouteProbe}, nil
 	}
 	nic, err := c.LocalNIC()
 	if err != nil {
@@ -763,14 +802,27 @@ func (c *Client) Login(ctx context.Context, account, password string) (Result, e
 			return Result{}, ErrCampusUnavailable
 		}
 	}
-	info, hijacked, err := c.PortalInfo(ctx)
-	switch {
-	case err != nil:
-		c.logf("探测网关重定向失败: %v", err)
-	case hijacked:
-		c.logf("确认未认证（探测到门户劫持）: ip=%s mac=%s ac=%s", info.UserIP, info.UserMAC, info.ACIP)
-	default:
-		c.logf("未探测到门户劫持")
+	// One criterion for both paths: the submission entry asks the same
+	// evidence object the monitor uses, so "conflict" cannot be checked in one
+	// place and forgotten in the other.
+	ev, evErr := c.evidence(ctx, nic)
+	state, why := ev.state()
+	if evErr != nil {
+		state, why = NetUnknown, ReasonPortalFailed
+		c.logf("探测网关重定向失败: %v", evErr)
+	} else if state == NetUnauthenticated {
+		c.logf("确认未认证（可信门户 + 参数匹配 + 无冲突）: ip=%s mac=%s ac=%s",
+			ev.info.UserIP, ev.info.UserMAC, ev.info.ACIP)
+	} else {
+		c.logf("网络状态未确认（%s），不据此提交", why)
+	}
+	info := ev.info
+	if state != NetUnauthenticated {
+		if auto {
+			c.logf("网络状态未确认，未提交认证")
+			return Result{Outcome: Unknown, NotSubmitted: true, Route: RouteUnconfirmed}, nil
+		}
+		c.logf("网络状态未确认，按用户要求强制尝试")
 	}
 	// Root discovery supplements (but never overrides) current hijack evidence.
 	rootAC := c.discoverAC(ctx)
@@ -821,7 +873,7 @@ func (c *Client) Login(ctx context.Context, account, password string) (Result, e
 		switch out {
 		case Success:
 			c.remember(sess)
-			return c.success(ctx, Result{OK: true, Outcome: Success, Msg: msg}), nil
+			return c.success(ctx, Result{OK: true, Outcome: Success, Msg: msg, Route: RoutePortal}), nil
 		case BadCredential:
 			return Result{Outcome: BadCredential, Msg: msg}, nil
 		case ParamMismatch:
@@ -831,9 +883,10 @@ func (c *Client) Login(ctx context.Context, account, password string) (Result, e
 		if err := c.Sleep(ctx, 2*time.Second); err != nil {
 			return Result{}, err
 		}
-		if c.Online(ctx) {
-			c.remember(sess)
-			return Result{OK: true, Outcome: out, Msg: msg}, nil
+		// Reaching the internet proves the network works, not that this
+		// combination was accepted: it must not be remembered as good.
+		if c.online(ctx) {
+			return Result{OK: true, Outcome: out, Msg: msg, Route: RouteProbe}, nil
 		}
 		if out == InUse {
 			return Result{Outcome: InUse, Msg: msg}, nil
@@ -898,7 +951,7 @@ func (c *Client) Login(ctx context.Context, account, password string) (Result, e
 // success waits for the gateway to route us and warns if it does not.
 // The login itself is not repeated.
 func (c *Client) success(ctx context.Context, r Result) Result {
-	if err := c.Sleep(ctx, 3*time.Second); err == nil && !c.Online(ctx) {
+	if err := c.Sleep(ctx, 3*time.Second); err == nil && !c.online(ctx) {
 		r.Warn = "认证成功但暂未连通外网，可能需要 1-2 分钟生效"
 		c.logf("%s", r.Warn)
 	}

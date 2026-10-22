@@ -9,14 +9,45 @@ import (
 )
 
 type fakePortal struct {
-	online  bool
-	results []portal.Result
-	errs    []error
-	logins  int
-	logouts int
+	online       bool
+	results      []portal.Result
+	errs         []error
+	logins       int
+	logouts      int
+	unknown      bool
+	reason       string
+	probes       int
+	notSubmitted bool
 }
 
 func (f *fakePortal) Online(context.Context) bool { return f.online }
+
+// ProbeState mirrors the boolean for these tests: offline means the portal
+// handed us evidence that this device is unauthenticated.
+func (f *fakePortal) ProbeState(context.Context) (portal.NetState, string) {
+	f.probes++
+	if f.online {
+		return portal.NetOnline, portal.ReasonProbeOK
+	}
+	if f.unknown {
+		reason := f.reason
+		if reason == "" {
+			reason = portal.ReasonPortalFailed
+		}
+		return portal.NetUnknown, reason
+	}
+	return portal.NetUnauthenticated, portal.ReasonPortalHijack
+}
+
+// LoginAuto goes through the same fake; tests that need the refusal use
+// notSubmitted.
+func (f *fakePortal) LoginAuto(ctx context.Context, account, password string) (portal.Result, error) {
+	if f.notSubmitted {
+		f.logins++
+		return portal.Result{Outcome: portal.Unknown, NotSubmitted: true, Route: portal.RouteUnconfirmed}, nil
+	}
+	return f.Login(ctx, account, password)
+}
 
 func (f *fakePortal) Login(context.Context, string, string) (portal.Result, error) {
 	i := f.logins
@@ -128,11 +159,17 @@ func TestServerCodesPause(t *testing.T) {
 
 func TestAccountChangeClearsServerPause(t *testing.T) {
 	p := &fakePortal{results: []portal.Result{{RetCode: 8}, {OK: true}}}
-	k, _, _ := setup(p, "a")
+	k, c, _ := setup(p, "a")
 	k.Tick(ctx)
 	k.handle(ctx, cmdAccount, false)
+	// Saving releases the pause but must not submit on its own.
+	if s := k.State(); s.Pause != NotPaused || p.logins != 1 {
+		t.Fatalf("after save: %+v logins=%d", s, p.logins)
+	}
+	c.advance(Interval)
+	k.Tick(ctx)
 	if s := k.State(); s.Phase != Online || p.logins != 2 {
-		t.Fatalf("%+v", s)
+		t.Fatalf("%+v logins=%d", s, p.logins)
 	}
 }
 
@@ -226,5 +263,43 @@ func TestSuccessBeforeRoutingWaits(t *testing.T) {
 	k.Tick(ctx)
 	if p.logins != 1 {
 		t.Fatalf("login resubmitted before the grace period: %d", p.logins)
+	}
+}
+
+// A boot that starts before the portal is reachable must not spend its first
+// minutes escalating the waits: those failures are "not routed yet", not "wrong
+// password". Inside BootWindow every retry is short, and the normal backoff
+// comes back afterwards.
+func TestBootWindowCapsBackoff(t *testing.T) {
+	p := &fakePortal{errs: []error{portal.ErrNoResponse, portal.ErrNoResponse, portal.ErrNoResponse}}
+	k, c, _ := setup(p, "a")
+	k.mu.Lock()
+	k.bootUntil = c.t.Add(BootWindow)
+	k.mu.Unlock()
+
+	for i := 1; i <= 2; i++ {
+		k.Tick(ctx)
+		if p.logins != i {
+			t.Fatalf("step %d: logins=%d", i, p.logins)
+		}
+		if got := k.State().NextRetry.Sub(c.t); got != BootInterval {
+			t.Fatalf("step %d: waited %v, want %v inside the boot window", i, got, BootInterval)
+		}
+		c.advance(BootInterval)
+	}
+	if got := k.wait(); got != BootInterval {
+		t.Fatalf("cadence %v, want %v", got, BootInterval)
+	}
+
+	// Past the window the ordinary backoff is back.
+	k.mu.Lock()
+	k.bootUntil = time.Time{}
+	k.mu.Unlock()
+	k.Tick(ctx)
+	if got := k.State().NextRetry.Sub(c.t); got != Backoff[2] {
+		t.Fatalf("after the window waited %v, want %v", got, Backoff[2])
+	}
+	if got := k.wait(); got != Interval {
+		t.Fatalf("cadence %v, want %v", got, Interval)
 	}
 }

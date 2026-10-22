@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"os"
 	"runtime"
 	"strings"
 	"sync"
@@ -52,9 +53,17 @@ type app struct {
 	disk chan func()
 }
 
+// processStart is when main began, before the GUI is initialised. The log says
+// both times so a slow first connection can be told apart from a slow window:
+// "进程启动" is the launch, "启动" is the GUI being ready.
+var processStart = time.Now()
+
 func main() {
 	if !mygo.App.RequestSingleInstanceLock() {
 		return // the running instance opens its window
+	}
+	if dir, err := mygo.App.Path(mygo.PathLogs); err == nil {
+		applog.Mark(dir, fmt.Sprintf("进程启动 pid=%d 参数=%q", os.Getpid(), strings.Join(os.Args[1:], " ")))
 	}
 	a := &app{firstOnline: make(chan struct{}), disk: make(chan func(), 16)}
 	mygo.App.OnSecondInstance(func([]string, string) { a.showWindow() })
@@ -80,14 +89,25 @@ func (a *app) ready() {
 	logDir, _ := mygo.App.Path(mygo.PathLogs)
 	a.log = applog.New(logDir)
 	a.store = store.New(dataDir)
-	a.log.Printf("GZIST NetKeeper v%s 启动 (%s/%s)", mygo.App.Version(), runtime.GOOS, runtime.GOARCH)
+	a.log.Printf("GZIST NetKeeper v%s 启动 (%s/%s) 进程启动后 %.1fs",
+		mygo.App.Version(), runtime.GOOS, runtime.GOARCH, time.Since(processStart).Seconds())
 
 	if removeLegacyAutostart() {
-		if err := mygo.App.SetOpenAtLogin(true); err != nil {
+		if note, err := enableAutostart(); err != nil {
 			a.log.Printf("迁移开机自启失败: %v", err)
 		} else {
-			a.log.Printf("已迁移旧版本的开机自启设置")
+			a.log.Add("已迁移旧版本的开机自启设置")
+			if note != "" {
+				a.log.Add(note)
+			}
 		}
+	}
+	// A build of 2.1.x registered autostart as a Run value; move it to the
+	// logon task once, so this fix does not need a manual toggle.
+	if note, err := upgradeAutostart(); err != nil {
+		a.log.Printf("升级开机自启失败: %v", err)
+	} else if note != "" {
+		a.log.Add(note)
 	}
 
 	go func() {
@@ -111,7 +131,7 @@ func (a *app) ready() {
 		hasPassword: pw != "",
 		insecure:    insecure,
 		keepAlive:   st.KeepAlive,
-		autostart:   mygo.App.OpenAtLogin(),
+		autostart:   autostartOn(),
 		version:     mygo.App.Version(),
 	}
 	if loadErr != nil {
@@ -127,6 +147,7 @@ func (a *app) ready() {
 		Restart:      a.restart,
 		OpenLogs:     func() { mygo.Shell.ShowItemInFolder(a.log.Path()) },
 		CopyLogs:     a.copyLogs,
+		Redraw:       func() { a.post(func() {}) },
 	}
 
 	a.client = portal.New(a.log.Add)
@@ -329,15 +350,26 @@ func (a *app) save(account, password string) {
 }
 
 func (a *app) setAutostart(on bool) {
-	if err := mygo.App.SetOpenAtLogin(on); err != nil {
+	note := ""
+	var err error
+	if on {
+		note, err = enableAutostart()
+	} else {
+		err = disableAutostart()
+	}
+	switch {
+	case err != nil:
 		a.log.Printf("设置开机自启失败: %v", err)
 		a.m.notice = "开机自启设置失败：" + err.Error()
-	} else if on {
-		a.log.Add("已开启开机自启")
-	} else {
+	case on:
+		a.log.Add("已开启开机自启（登录时由任务计划启动）")
+		if note != "" {
+			a.log.Add(note)
+		}
+	default:
 		a.log.Add("已关闭开机自启")
 	}
-	a.m.autostart = mygo.App.OpenAtLogin()
+	a.m.autostart = autostartOn()
 	a.syncTray()
 	if a.win != nil && !a.win.IsDestroyed() {
 		a.win.Invalidate()

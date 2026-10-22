@@ -21,6 +21,9 @@ func TestManualOnlineOnlyKeepsAlive(t *testing.T) {
 	}
 }
 
+// A recovered connection clears the visible error text but must keep the
+// submit cooldown: reaching the internet says nothing about the attempt that
+// failed, and clearing it would let a flapping link reset the backoff forever.
 func TestOnlineRecoveryClearsStaleErrorWithoutLogin(t *testing.T) {
 	p := &fakePortal{online: true}
 	k, clock, _ := setup(p, "a")
@@ -33,8 +36,11 @@ func TestOnlineRecoveryClearsStaleErrorWithoutLogin(t *testing.T) {
 		clock.advance(Interval)
 	}
 	s := k.State()
-	if s.LastError != "" || s.RetCode != 0 || s.Failures != 0 || !s.NextRetry.IsZero() || !s.LastLogin.IsZero() || p.logins != 0 {
+	if s.LastError != "" || s.RetCode != 0 || !s.LastLogin.IsZero() || p.logins != 0 {
 		t.Fatalf("state=%+v logins=%d", s, p.logins)
+	}
+	if s.Failures != 2 {
+		t.Fatalf("submit failures were cleared by an online probe: %d", s.Failures)
 	}
 }
 

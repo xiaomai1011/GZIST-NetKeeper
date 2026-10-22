@@ -52,3 +52,23 @@ func TestRotationRepeats(t *testing.T) {
 		t.Fatal("log not reopened after rotation")
 	}
 }
+
+// Mark writes before the application exists, so it must open, append and close
+// on its own — and stay harmless when the directory is empty or unusable.
+func TestMarkWritesWithoutALog(t *testing.T) {
+	dir := t.TempDir()
+	Mark(dir, "进程启动 pid=1")
+	Mark(dir, "进程启动 pid=2")
+	Mark("", "ignored")
+	b, err := os.ReadFile(dir + string(os.PathSeparator) + "netkeeper.log")
+	if err != nil {
+		t.Fatalf("no log file: %v", err)
+	}
+	s := string(b)
+	if strings.Count(s, "进程启动") != 2 {
+		t.Fatalf("wrote %q", s)
+	}
+	if !strings.Contains(s, "2026-") && !strings.Contains(s, "-") {
+		t.Fatalf("no timestamp: %q", s)
+	}
+}

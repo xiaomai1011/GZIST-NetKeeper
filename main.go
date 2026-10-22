@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"os"
 	"runtime"
 	"strings"
 	"sync"
@@ -52,9 +53,17 @@ type app struct {
 	disk chan func()
 }
 
+// processStart is when main began, before the GUI is initialised. The log says
+// both times so a slow first connection can be told apart from a slow window:
+// "进程启动" is the launch, "启动" is the GUI being ready.
+var processStart = time.Now()
+
 func main() {
 	if !mygo.App.RequestSingleInstanceLock() {
 		return // the running instance opens its window
+	}
+	if dir, err := mygo.App.Path(mygo.PathLogs); err == nil {
+		applog.Mark(dir, fmt.Sprintf("进程启动 pid=%d 参数=%q", os.Getpid(), strings.Join(os.Args[1:], " ")))
 	}
 	a := &app{firstOnline: make(chan struct{}), disk: make(chan func(), 16)}
 	mygo.App.OnSecondInstance(func([]string, string) { a.showWindow() })
@@ -80,7 +89,8 @@ func (a *app) ready() {
 	logDir, _ := mygo.App.Path(mygo.PathLogs)
 	a.log = applog.New(logDir)
 	a.store = store.New(dataDir)
-	a.log.Printf("GZIST NetKeeper v%s 启动 (%s/%s)", mygo.App.Version(), runtime.GOOS, runtime.GOARCH)
+	a.log.Printf("GZIST NetKeeper v%s 启动 (%s/%s) 进程启动后 %.1fs",
+		mygo.App.Version(), runtime.GOOS, runtime.GOARCH, time.Since(processStart).Seconds())
 
 	if removeLegacyAutostart() {
 		if note, err := enableAutostart(); err != nil {

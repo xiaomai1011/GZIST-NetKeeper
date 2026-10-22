@@ -80,6 +80,28 @@ func (l *Log) warn(format string, args ...any) {
 // Path is the log file, or "" when logging to memory only.
 func (l *Log) Path() string { return l.path }
 
+// Mark appends one line to dir/netkeeper.log and closes the file again.
+//
+// It exists for the moment before the application (and its Log) exists: a boot
+// can then be measured from two lines instead of guessed. "进程启动" is when the
+// system started this process, "启动" is when the GUI was ready, and the gap
+// between them says whether a slow first connection is the launch or the
+// window.
+func Mark(dir, msg string) {
+	if dir == "" {
+		return
+	}
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return
+	}
+	f, err := os.OpenFile(filepath.Join(dir, "netkeeper.log"), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+	fmt.Fprintf(f, "%s  %s\n", time.Now().Format("2006-01-02 15:04:05"), msg)
+}
+
 // OnChange registers a callback run (on the logging goroutine) after each
 // line.
 func (l *Log) OnChange(fn func()) {

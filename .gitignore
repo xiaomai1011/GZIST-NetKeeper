@@ -16,3 +16,6 @@ Thumbs.db
 desktop.ini
 
 # 打包好的保活程序就放在本仓库的 app/ 目录
+
+# 调试残留目录（7418d07 误把 .tmp-symtest 提交进了仓库）
+.tmp-*/

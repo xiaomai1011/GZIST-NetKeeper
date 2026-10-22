@@ -34,6 +34,7 @@ type actions struct {
 	Restart      func()
 	OpenLogs     func()
 	CopyLogs     func() // copies the log with personal data masked
+	Redraw       func()
 }
 
 // model is everything the main window shows. It is only touched on the
@@ -53,6 +54,7 @@ type model struct {
 	logScroll   ui.ScrollState
 	update      string // version ready to install
 	version     string
+	forceArmed  bool // "network state unknown, try anyway" was clicked once
 	act         actions
 }
 
@@ -83,6 +85,10 @@ func describe(st keeper.State, hasAccount bool) status {
 		return status{"已注销", "自动保活已暂停，点「立即登录」继续", colTaki, art.TrayOffline}
 	case !st.KeepAlive:
 		return status{"离线", "自动保活已关闭", colTaki, art.TrayOffline}
+	case st.Reason == portal.ReasonPortalHijack:
+		return status{"未认证", "已确认需要登录，正在尝试认证", colSoyo, art.TrayOffline}
+	case st.Reason != "" && !st.Online:
+		return status{"网络异常", "无法确认网络状态，未提交认证", colSoyo, art.TrayError}
 	case st.LastError != "":
 		return status{"离线", "迷子中… " + st.LastError, colTaki, art.TrayError}
 	default:
@@ -241,6 +247,8 @@ func (m *model) statusCard(c *ui.Context, t *ui.Theme, s status) {
 				ui.Text(c, k).FontSize(12).TextColor(t.TextMuted)
 				ui.Text(c, v).FontSize(12).Selectable()
 			}
+			kv("网络", netLabel(m.st))
+			kv("本次认证", dash(m.st.Auth))
 			kv("IP", dash(m.nic.IP))
 			kv("MAC", dash(portal.DashedMAC(m.nic.MAC)))
 			last := "—"
@@ -249,16 +257,42 @@ func (m *model) statusCard(c *ui.Context, t *ui.Theme, s status) {
 			}
 			kv("上次登录", last)
 		})
+		if m.netUnknown() {
+			ui.Text(c, "网络状态无法确认：强制登录会直接向认证服务器提交一次密码，通常不必这么做。").
+				FontSize(12).Wrap().TextColor(t.TextMuted)
+		}
 		ui.Row(c).Gap(8).Children(func() {
 			busy := m.st.Busy()
-			if ui.PrimaryButton(c, "立即登录").Grow(1).Disabled(busy || m.saved == "").Clicked() {
-				m.act.Login()
+			switch {
+			case m.netUnknown() && m.forceArmed:
+				if ui.PrimaryButton(c, "确认提交").Grow(1).Disabled(busy || m.saved == "").Clicked() {
+					m.forceArmed = false
+					m.act.Login()
+				}
+				if ui.Button(c, "取消").Grow(1).Clicked() {
+					m.forceArmed = false
+					m.act.Redraw()
+				}
+			case m.netUnknown():
+				if ui.PrimaryButton(c, "强制登录").Grow(1).Disabled(busy || m.saved == "").Clicked() {
+					// Ask before submitting: one click must not mean three things.
+					m.forceArmed = true
+					m.act.Redraw()
+				}
+			default:
+				if ui.PrimaryButton(c, "立即登录").Grow(1).Disabled(busy || m.saved == "").Clicked() {
+					m.act.Login()
+				}
 			}
-			if ui.Button(c, "注销").Grow(1).Disabled(busy || m.saved == "").Clicked() {
-				m.act.Logout()
-			}
-			if ui.Button(c, "诊断").Grow(1).Clicked() {
-				m.act.Diagnose()
+			// While the confirmation is on screen the row holds only those two
+			// buttons: four in a row would be neither readable nor safe.
+			if !m.forceArmed {
+				if ui.Button(c, "注销").Grow(1).Disabled(busy || m.saved == "").Clicked() {
+					m.act.Logout()
+				}
+				if ui.Button(c, "诊断").Grow(1).Clicked() {
+					m.act.Diagnose()
+				}
 			}
 		})
 	})
@@ -379,4 +413,27 @@ func (m *model) footer(c *ui.Context, t *ui.Theme) {
 		}
 		ui.Text(c, "it's MyGO!!!!!  ·  v"+m.version).FontSize(11).TextColor(t.TextMuted)
 	})
+}
+
+// netUnknown reports a state that is genuinely undetermined: not offline by
+// evidence, not online either. Only then is a confirmation needed before the
+// manual path submits a password.
+func (m *model) netUnknown() bool {
+	if m.st.Online || m.st.Phase == keeper.Online || m.st.Busy() {
+		return false
+	}
+	return m.st.Reason != "" && m.st.Reason != portal.ReasonPortalHijack
+}
+
+// netLabel is the network half of the two independent status fields.
+func netLabel(st keeper.State) string {
+	switch {
+	case st.Online || st.Phase == keeper.Online:
+		return "在线"
+	case st.Reason == portal.ReasonPortalHijack:
+		return "未认证"
+	case st.Reason != "":
+		return "未知（" + st.Reason + "）"
+	}
+	return "—"
 }

@@ -172,6 +172,23 @@ func TestScreenshots(t *testing.T) {
 			m.st = keeper.State{Phase: keeper.Offline, Pause: keeper.PausedByServer, RetCode: 8, LastError: portal.Advice(8), KeepAlive: true}
 			m.update, m.logs = "v2.0.1", logs[:5]
 		},
+		// The two fields are independent: the attempt below was never
+		// confirmed, and the network state has since become unknown.
+		"unknown": func(m *model) {
+			m.saved, m.account, m.hasPassword = "2023001", "2023001", true
+			m.st = keeper.State{Phase: keeper.Offline, KeepAlive: true,
+				Reason: portal.ReasonPortalFailed, Auth: "未确认（网络已恢复）"}
+			m.nic = portal.NIC{IP: "10.20.30.40", MAC: "AABBCCDDEEFF"}
+			m.logs = logs[:5]
+		},
+		// Same state after the first click: the confirmation is on screen.
+		"unknown-armed": func(m *model) {
+			m.saved, m.account, m.hasPassword = "2023001", "2023001", true
+			m.st = keeper.State{Phase: keeper.Offline, KeepAlive: true,
+				Reason: portal.ReasonPortalFailed, Auth: "未确认（网络已恢复）"}
+			m.nic = portal.NIC{IP: "10.20.30.40", MAC: "AABBCCDDEEFF"}
+			m.forceArmed = true
+		},
 		"logging-in": func(m *model) {
 			m.saved, m.account, m.hasPassword = "2023001", "2023001", true
 			m.st = keeper.State{Phase: keeper.LoggingIn, KeepAlive: true}

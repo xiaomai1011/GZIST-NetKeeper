@@ -137,6 +137,7 @@ func (a *app) ready() {
 		Restart:      a.restart,
 		OpenLogs:     func() { mygo.Shell.ShowItemInFolder(a.log.Path()) },
 		CopyLogs:     a.copyLogs,
+		Redraw:       func() { a.post(func() {}) },
 	}
 
 	a.client = portal.New(a.log.Add)
